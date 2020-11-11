@@ -2,6 +2,9 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#define MAX_PRIM_COUNT	126
+#define MAX_VERT_COUNT	64
+
 struct Vertex
 {
 	float3 Position;
@@ -10,10 +13,10 @@ struct Vertex
 
 struct VertexOut
 {
-	float4 PositionHS   : SV_Position;
-	float3 PositionVS   : POSITION0;
-	float3 Normal       : NORMAL0;
-	uint   MeshletIndex : COLOR0;
+	float4 PositionHS   : SV_POSITION;
+	float3 PositionVS   : POSITION;
+	float3 Normal       : NORMAL;
+	uint   MeshletIndex : COLOR;
 };
 
 struct Meshlet
@@ -112,8 +115,8 @@ Meshlet MeshShader(uint gtid, uint gid, out uint3 tri, out VertexOut vert)
 void main(
 	uint gtid : SV_GroupThreadID,
 	uint gid : SV_GroupID,
-	out indices uint3 tris[126],
-	out vertices VertexOut verts[64]
+	out indices uint3 tris[MAX_PRIM_COUNT],
+	out vertices VertexOut verts[MAX_VERT_COUNT]
 )
 {
 	uint3 tri;

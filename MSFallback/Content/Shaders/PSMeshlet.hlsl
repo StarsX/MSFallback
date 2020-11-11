@@ -4,10 +4,10 @@
 
 struct VertexOut
 {
-	float4 PositionHS   : SV_Position;
-	float3 PositionVS   : POSITION0;
-	float3 Normal       : NORMAL0;
-	uint   MeshletIndex : COLOR0;
+	float4 PositionHS   : SV_POSITION;
+	float3 PositionVS   : POSITION;
+	float3 Normal       : NORMAL;
+	uint   MeshletIndex : COLOR;
 };
 
 cbuffer Constants

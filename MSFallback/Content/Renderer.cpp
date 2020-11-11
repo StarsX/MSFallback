@@ -5,6 +5,9 @@
 #include "SharedConst.h"
 #include "Renderer.h"
 
+#define MAX_PRIM_COUNT	126
+#define MAX_VERT_COUNT	64
+
 using namespace std;
 using namespace DirectX;
 using namespace XUSG;
@@ -179,10 +182,10 @@ bool Renderer::createPayloadBuffers()
 	};
 
 	m_vertPayloads = StructuredBuffer::MakeUnique();
-	N_RETURN(m_vertPayloads->Create(m_device, 64 * maxMeshletCount, sizeof(VertexOut), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+	N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT* maxMeshletCount, sizeof(VertexOut), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
 
 	m_primIdxPayloads = StructuredBuffer::MakeUnique();
-	N_RETURN(m_primIdxPayloads->Create(m_device, 126 * maxMeshletCount, sizeof(uint32_t), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+	N_RETURN(m_primIdxPayloads->Create(m_device, MAX_PRIM_COUNT * maxMeshletCount, sizeof(uint32_t), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
 
 	return true;
 }
@@ -393,7 +396,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 
 			// Record commands.
 			pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-			pCommandList->Draw(3 * 126, subset.Count, 0, 0);
+			pCommandList->Draw(3 * MAX_PRIM_COUNT, subset.Count, 0, 0);
 		}
 	}
 }

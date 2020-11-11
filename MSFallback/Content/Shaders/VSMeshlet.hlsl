@@ -2,12 +2,15 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#define MAX_PRIM_COUNT	126
+#define MAX_VERT_COUNT	64
+
 struct VertexOut
 {
-	float4 PositionHS   : SV_Position;
-	float3 PositionVS   : POSITION0;
-	float3 Normal       : NORMAL0;
-	uint   MeshletIndex : COLOR0;
+	float4 PositionHS   : SV_POSITION;
+	float3 PositionVS   : POSITION;
+	float3 Normal       : NORMAL;
+	uint   MeshletIndex : COLOR;
 };
 
 StructuredBuffer<VertexOut> VertPayloads;
@@ -21,9 +24,14 @@ uint3 UnpackPrimitive(uint primitive)
 
 VertexOut main(uint vid : SV_VertexID, uint iid : SV_InstanceID)
 {
-	const uint primitive = PrimIdxPayloads[126 * iid + vid / 3];
-	const uint index = UnpackPrimitive(primitive)[vid % 3];
-	const VertexOut vert = VertPayloads[64 * iid + index];
+	VertexOut vert = (VertexOut)0;
+	const uint primitive = PrimIdxPayloads[MAX_PRIM_COUNT * iid + vid / 3];
+
+	if (primitive < 0xffffffff)
+	{
+		const uint index = UnpackPrimitive(primitive)[vid % 3];
+		vert = VertPayloads[MAX_VERT_COUNT * iid + index];
+	}
 
 	return vert;
 }

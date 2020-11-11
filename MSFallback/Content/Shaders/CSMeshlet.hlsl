@@ -14,8 +14,9 @@ void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 	VertexOut vert;
 	const Meshlet m = MeshShader(gtid, gid, tri, vert);
 
-	if (gtid < m.PrimCount)
-		PrimIdxPayloads[126 * gid + gtid] = tri.x | (tri.y << 10) | (tri.z << 20);
+	if (gtid < MAX_PRIM_COUNT)
+		PrimIdxPayloads[MAX_PRIM_COUNT * gid + gtid] = gtid < m.PrimCount ?
+			tri.x | (tri.y << 10) | (tri.z << 20) : 0xffffffff;
 
-	if (gtid < m.VertCount) VertPayloads[64 * gid + gtid] = vert;
+	if (gtid < m.VertCount) VertPayloads[MAX_VERT_COUNT * gid + gtid] = vert;
 }
