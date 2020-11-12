@@ -85,7 +85,6 @@ protected:
 	bool createDescriptorTables();
 	void renderMS(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
-	void renderVS(XUSG::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
 
@@ -98,8 +97,8 @@ protected:
 	XUSG::DescriptorTable		m_uavTable;
 	XUSG::DescriptorTable		m_samplerTable;
 
+	XUSG::IndexBuffer::uptr		m_indexPayloads;
 	XUSG::StructuredBuffer::uptr m_vertPayloads;
-	XUSG::StructuredBuffer::uptr m_primIdxPayloads;
 
 	std::vector<XUSG::StructuredBuffer::uptr> m_vertices;
 	std::vector<XUSG::StructuredBuffer::uptr> m_meshlets;

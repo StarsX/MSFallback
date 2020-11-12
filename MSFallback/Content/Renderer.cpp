@@ -182,10 +182,12 @@ bool Renderer::createPayloadBuffers()
 	};
 
 	m_vertPayloads = StructuredBuffer::MakeUnique();
-	N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT* maxMeshletCount, sizeof(VertexOut), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+	N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
 
-	m_primIdxPayloads = StructuredBuffer::MakeUnique();
-	N_RETURN(m_primIdxPayloads->Create(m_device, MAX_PRIM_COUNT * maxMeshletCount, sizeof(uint32_t), ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+	m_indexPayloads = IndexBuffer::MakeUnique();
+	N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t) * 3 * MAX_PRIM_COUNT * maxMeshletCount,
+		Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
 
 	return true;
 }
@@ -221,7 +223,7 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		// Get pipeline layout
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRange(1, DescriptorType::SRV, 2, 0);
+		pipelineLayout->SetRange(1, DescriptorType::SRV, 1, 0);
 		pipelineLayout->SetShaderStage(1, Shader::VS);
 		X_RETURN(m_pipelineLayouts[MESHLET_VS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"VSMeshletLayout"), false);
@@ -301,7 +303,7 @@ bool Renderer::createDescriptorTables()
 		const Descriptor descriptors[] =
 		{
 			m_vertPayloads->GetUAV(),
-			m_primIdxPayloads->GetUAV()
+			m_indexPayloads->GetUAV()
 		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
@@ -310,13 +312,8 @@ bool Renderer::createDescriptorTables()
 
 	// Payload SRVs
 	{
-		const Descriptor descriptors[] =
-		{
-			m_vertPayloads->GetSRV(),
-			m_primIdxPayloads->GetSRV()
-		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+		descriptorTable->SetDescriptors(0, 1, &m_vertPayloads->GetSRV());
 		X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
@@ -365,7 +362,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			// Set barriers
 			ResourceBarrier barriers[2];
 			auto numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-			numBarriers = m_primIdxPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
 
 			// Set descriptor tables
 			pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_LAYOUT]);
@@ -383,7 +380,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 
 			// Set barriers
 			numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
-			numBarriers = m_primIdxPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
+			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::INDEX_BUFFER, numBarriers);
 			pCommandList->Barrier(numBarriers, barriers);
 
 			// Set descriptor tables
@@ -396,7 +393,8 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 
 			// Record commands.
 			pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-			pCommandList->Draw(3 * MAX_PRIM_COUNT, subset.Count, 0, 0);
+			pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
+			pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * subset.Count, 1, 0, 0, 0);
 		}
 	}
 }

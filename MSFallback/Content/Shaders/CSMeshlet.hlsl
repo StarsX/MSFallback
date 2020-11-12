@@ -4,8 +4,8 @@
 
 #include "MSMeshlet.hlsl"
 
-RWStructuredBuffer<VertexOut> VertPayloads;
-RWStructuredBuffer<uint>	PrimIdxPayloads;
+RWStructuredBuffer<VertexOut> VertexPayloads;
+RWBuffer<uint> IndexPayloads;
 
 [numthreads(128, 1, 1)]
 void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
@@ -15,8 +15,14 @@ void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 	const Meshlet m = MeshShader(gtid, gid, tri, vert);
 
 	if (gtid < MAX_PRIM_COUNT)
-		PrimIdxPayloads[MAX_PRIM_COUNT * gid + gtid] = gtid < m.PrimCount ?
-			tri.x | (tri.y << 10) | (tri.z << 20) : 0xffffffff;
+	{
+		const uint baseAddr = 3 * (MAX_PRIM_COUNT * gid + gtid);
+		const uint baseIdx = MAX_VERT_COUNT * gid;
 
-	if (gtid < m.VertCount) VertPayloads[MAX_VERT_COUNT * gid + gtid] = vert;
+		[unroll]
+		for (uint i = 0; i < 3; ++i)
+			IndexPayloads[baseAddr + i] = gtid < m.PrimCount ? baseIdx + tri[i] : 0xffffffff;
+	}
+
+	if (gtid < m.VertCount) VertexPayloads[MAX_VERT_COUNT * gid + gtid] = vert;
 }

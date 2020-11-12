@@ -23,7 +23,7 @@ MSFallback::MSFallback(uint32_t width, uint32_t height, std::wstring name) :
 	m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
 	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height)),
 	m_isMSSupported(false),
-	m_useMeshShader(true),
+	m_useMeshShader(false),
 	m_showFPS(true),
 	m_pausing(false),
 	m_tracking(false),
