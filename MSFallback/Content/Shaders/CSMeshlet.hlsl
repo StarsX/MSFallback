@@ -11,7 +11,7 @@ RWBuffer<uint> IndexPayloads;
 void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 {
 	uint3 tri;
-	VertexOut vert;
+	VertexOut vert = (VertexOut)0;
 	const Meshlet m = MeshShader(gtid, gid, tri, vert);
 
 	if (gtid < MAX_PRIM_COUNT)

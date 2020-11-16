@@ -2,21 +2,7 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-struct VertexOut
-{
-	float4 PositionHS   : SV_POSITION;
-	float3 PositionVS   : POSITION;
-	float3 Normal       : NORMAL;
-	uint   MeshletIndex : COLOR;
-};
-
-cbuffer Constants
-{
-	float4x4 Globals_World;
-	float4x4 Globals_WorldView;
-	float4x4 Globals_WorldViewProj;
-	uint     Globals_DrawMeshlets;
-};
+#include "MeshletCommon.hlsli"
 
 float4 main(VertexOut input) : SV_TARGET
 {
@@ -26,7 +12,7 @@ float4 main(VertexOut input) : SV_TARGET
 
 	float3 diffuseColor;
 	float shininess;
-	if (Globals_DrawMeshlets)
+	if (Constants.DrawMeshlets)
 	{
 		const uint meshletIndex = input.MeshletIndex;
 		diffuseColor = float3(

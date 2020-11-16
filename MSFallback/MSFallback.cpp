@@ -27,8 +27,8 @@ MSFallback::MSFallback(uint32_t width, uint32_t height, std::wstring name) :
 	m_showFPS(true),
 	m_pausing(false),
 	m_tracking(false),
-	m_meshFileName(L"Media/Dragon_LOD0.bin"),
-	m_meshPosScale(0.0f, 0.0f, 0.0f, 1.0f)
+	m_modelFilenames{ L"Media/Dragon_LOD0.bin" },
+	m_objDefs{ { {}, {}, 0.2f, true, true } }  // View Model
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -154,7 +154,8 @@ void MSFallback::LoadAssets()
 	/// Resolve pso mismatch by using'D24_UNORM_S8_UINT'
 	/// </Hard Code>
 	if (!m_renderer->Init(pCommandList, m_width, m_height, m_renderTargets[0]->GetFormat(),
-		uploaders, m_meshFileName.c_str(), m_meshPosScale, m_isMSSupported)) ThrowIfFailed(E_FAIL);
+		uploaders, static_cast<uint32_t>(size(m_objDefs)), m_modelFilenames, m_objDefs,
+		m_isMSSupported)) ThrowIfFailed(E_FAIL);
 
 	// Close the command list and execute it to begin the initial GPU setup.
 	ThrowIfFailed(pCommandList->Close());
@@ -180,8 +181,8 @@ void MSFallback::LoadAssets()
 	XMStoreFloat4x4(&m_proj, proj);
 
 	// View initialization
-	m_focusPt = XMFLOAT3(0.0f, 60.0f, 0.0f);
-	m_eyePt = XMFLOAT3(0.0f, 75.0f, 150.0f);
+	m_focusPt = XMFLOAT3(0.0f, 15.0f, 0.0f);
+	m_eyePt = XMFLOAT3(-25.0f, 15.0f, 25.0f);
 	const auto focusPt = XMLoadFloat3(&m_focusPt);
 	const auto eyePt = XMLoadFloat3(&m_eyePt);
 	const auto view = XMMatrixLookAtRH(eyePt, focusPt, XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
@@ -318,11 +319,11 @@ void MSFallback::ParseCommandLineArgs(wchar_t* argv[], int argc)
 		if (_wcsnicmp(argv[i], L"-mesh", wcslen(argv[i])) == 0 ||
 			_wcsnicmp(argv[i], L"/mesh", wcslen(argv[i])) == 0)
 		{
-			if (i + 1 < argc) m_meshFileName = argv[i + 1];
-			m_meshPosScale.x = i + 2 < argc ? static_cast<float>(_wtof(argv[i + 2])) : m_meshPosScale.x;
-			m_meshPosScale.y = i + 3 < argc ? static_cast<float>(_wtof(argv[i + 3])) : m_meshPosScale.y;
-			m_meshPosScale.z = i + 4 < argc ? static_cast<float>(_wtof(argv[i + 4])) : m_meshPosScale.z;
-			m_meshPosScale.w = i + 5 < argc ? static_cast<float>(_wtof(argv[i + 5])) : m_meshPosScale.w;
+			if (i + 1 < argc) m_modelFilenames[0] = argv[i + 1];
+			m_objDefs[0].Position.x = i + 2 < argc ? static_cast<float>(_wtof(argv[i + 2])) : m_objDefs[0].Position.x;
+			m_objDefs[0].Position.y = i + 3 < argc ? static_cast<float>(_wtof(argv[i + 3])) : m_objDefs[0].Position.y;
+			m_objDefs[0].Position.z = i + 4 < argc ? static_cast<float>(_wtof(argv[i + 4])) : m_objDefs[0].Position.z;
+			m_objDefs[0].Scale = i + 5 < argc ? static_cast<float>(_wtof(argv[i + 5])) : m_objDefs[0].Scale;
 			break;
 		}
 	}

@@ -81,11 +81,12 @@ private:
 
 	// User camera interactions
 	bool m_tracking;
-	DirectX::XMFLOAT2 m_mousePt;
+	XMFLOAT2 m_mousePt;
 
 	// User external settings
-	std::wstring m_meshFileName;
-	XMFLOAT4 m_meshPosScale;
+	static const uint32_t MODEL_COUNT = 1;
+	std::wstring m_modelFilenames[MODEL_COUNT];
+	Renderer::ObjectDef m_objDefs[MODEL_COUNT];
 
 	void LoadPipeline();
 	void LoadAssets();

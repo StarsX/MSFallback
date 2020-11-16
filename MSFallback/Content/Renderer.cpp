@@ -28,29 +28,46 @@ Renderer::~Renderer()
 }
 
 bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, Format rtFormat,
-	vector<Resource>& uploaders, const wchar_t* fileName, const XMFLOAT4& posScale, bool isMSSupported)
+	vector<Resource>& uploaders, uint32_t objCount, const wstring* pFileNames, const ObjectDef* pObjDefs,
+	bool isMSSupported)
 {
 	m_viewport.x = static_cast<float>(width);
 	m_viewport.y = static_cast<float>(height);
-	m_posScale = posScale;
 
 	// Load inputs
-	Model model;
-	model.LoadFromFile(fileName);
-	const auto meshCount = model.GetMeshCount();
-	m_subsets.resize(meshCount);
-	m_indexBytes.resize(meshCount);
-	m_vertices.resize(meshCount);
-	m_meshlets.resize(meshCount);
-	m_primitiveIndices.resize(meshCount);
-	m_uniqueVertexIndices.resize(meshCount);
-	for (auto i = 0u; i < meshCount; ++i)
+	m_sceneObjects.resize(objCount);
+	for (auto i = 0u; i < objCount; ++i)
 	{
-		const auto& mesh = model.GetMesh(i);
-		m_subsets[i].resize(mesh.MeshletSubsets.size());
-		memcpy(m_subsets[i].data(), mesh.MeshletSubsets.data(), sizeof(Subset) * mesh.MeshletSubsets.size());
-		m_indexBytes[i] = mesh.IndexSize;
-		N_RETURN(createMeshBuffers(pCommandList, i, mesh, uploaders), false);
+		Model model;
+		model.LoadFromFile(pFileNames[i].c_str());
+		const auto meshCount = model.GetMeshCount();
+
+		const auto& def = pObjDefs[i];
+		auto& obj = m_sceneObjects[i];
+		obj.Meshes.resize(meshCount);
+
+		for (auto j = 0u; j < meshCount; ++j)
+		{
+			auto& mesh = obj.Meshes[j];
+			const auto& meshData = model.GetMesh(j);
+			mesh.Subsets.resize(meshData.MeshletSubsets.size());
+			memcpy(mesh.Subsets.data(), meshData.MeshletSubsets.data(), sizeof(Subset) * meshData.MeshletSubsets.size());
+			mesh.MeshletCount = static_cast<uint32_t>(meshData.Meshlets.size());
+			N_RETURN(createMeshBuffers(pCommandList, mesh, meshData, uploaders), false);
+		}
+
+		// Convert the transform definition to a matrix
+		XMMATRIX world = XMMatrixAffineTransformation(
+			XMVectorReplicate(def.Scale),
+			g_XMZero,
+			XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3(&def.Rotation)),
+			XMLoadFloat3(&def.Position)
+		);
+		XMStoreFloat3x4(&obj.World, world);
+
+		obj.Instance = ConstantBuffer::MakeUnique();
+		N_RETURN(obj.Instance->Create(m_device, sizeof(Instance), FrameCount, nullptr, MemoryType::UPLOAD, L"CBInstance"), false);
+		obj.CbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(obj.Instance->Map(1)) - reinterpret_cast<uint8_t*>(obj.Instance->Map()));
 	}
 
 	N_RETURN(createPayloadBuffers(), false);
@@ -65,7 +82,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	N_RETURN(createDescriptorTables(), false);
 
 	m_cbGlobals = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbGlobals->Create(m_device, sizeof(CBGlobals), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
+	N_RETURN(m_cbGlobals->Create(m_device, sizeof(Constants), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
 	m_cbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(m_cbGlobals->Map(1)) - reinterpret_cast<uint8_t*>(m_cbGlobals->Map()));
 
 	return true;
@@ -73,19 +90,27 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 
 void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, CXMMATRIX proj)
 {
-	// General matrices
-	const auto world = XMMatrixScaling(m_posScale.w, m_posScale.w, m_posScale.w) *
-		XMMatrixTranslation(m_posScale.x, m_posScale.y, m_posScale.z);
-	const auto worldView = world * view;
-	const auto worldViewProj = worldView * proj;
-	
 	// Global constants
 	{
-		const auto pCbData = reinterpret_cast<CBGlobals*>(m_cbGlobals->Map(frameIndex));
-		XMStoreFloat4x4(&pCbData->World, XMMatrixTranspose(world));
-		XMStoreFloat4x4(&pCbData->WorldView, XMMatrixTranspose(worldView));
-		XMStoreFloat4x4(&pCbData->WorldViewProj, XMMatrixTranspose(worldViewProj));
+		const auto pCbData = reinterpret_cast<Constants*>(m_cbGlobals->Map(frameIndex));
+		XMStoreFloat3x4(&pCbData->View, view); // XMStoreFloat3x4 includes transpose.
+		XMStoreFloat4x4(&pCbData->ViewProj, XMMatrixTranspose(view * proj));
 		pCbData->DrawMeshlets = true;
+	}
+
+	// Per instance
+	for (auto& obj : m_sceneObjects)
+	{
+		const auto world = XMLoadFloat3x4(&obj.World);
+
+		XMVECTOR scale, rot, pos;
+		XMMatrixDecompose(&scale, &rot, &pos, world);
+
+		const auto pCbData = reinterpret_cast<Instance*>(obj.Instance->Map(frameIndex));
+		XMStoreFloat3x4(&pCbData->World, world); // XMStoreFloat3x4 includes transpose.
+		XMStoreFloat3x4(&pCbData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
+		pCbData->Scale = XMVectorGetX(scale);
+		pCbData->Flags = CULL_FLAG | MESHLET_FLAG;
 	}
 }
 
@@ -114,53 +139,80 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint32_t frameIndex,
 	else renderFallback(pCommandList, frameIndex);
 }
 
-bool Renderer::createMeshBuffers(CommandList* pCommandList, uint32_t i, const Mesh& mesh, std::vector<Resource>& uploaders)
+bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<Resource>& uploaders)
 {
 	{
-		auto& vertices = m_vertices[i];
-		const auto stride = mesh.VertexStrides[0];
-		const auto numElements = static_cast<uint32_t>(mesh.Vertices[0].size()) / stride;
+		auto& vertices = mesh.Vertices;
+		const auto stride = meshData.VertexStrides[0];
+		const auto numElements = static_cast<uint32_t>(meshData.Vertices[0].size()) / stride;
 		vertices = StructuredBuffer::MakeUnique();
 		N_RETURN(vertices->Create(m_device, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.push_back(nullptr);
 
-		N_RETURN(vertices->Upload(pCommandList, uploaders.back(), mesh.Vertices[0].data(), stride * numElements, 0,
+		N_RETURN(vertices->Upload(pCommandList, uploaders.back(), meshData.Vertices[0].data(), stride * numElements, 0,
 			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
 	{
-		auto& meshlets = m_meshlets[i];
+		auto& meshlets = mesh.Meshlets;
 		const uint32_t stride = sizeof(Meshlet);
-		const auto numElements = static_cast<uint32_t>(mesh.Meshlets.size());
+		const auto numElements = static_cast<uint32_t>(meshData.Meshlets.size());
 		meshlets = StructuredBuffer::MakeUnique();
 		N_RETURN(meshlets->Create(m_device, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.push_back(nullptr);
 
-		N_RETURN(meshlets->Upload(pCommandList, uploaders.back(), mesh.Meshlets.data(), stride * numElements, 0,
+		N_RETURN(meshlets->Upload(pCommandList, uploaders.back(), meshData.Meshlets.data(), stride * numElements, 0,
 			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
 	{
-		auto& primitiveIndices = m_primitiveIndices[i];
+		auto& primitiveIndices = mesh.PrimitiveIndices;
 		const uint32_t stride = sizeof(PackedTriangle);
-		const auto numElements = static_cast<uint32_t>(mesh.PrimitiveIndices.size());
+		const auto numElements = static_cast<uint32_t>(meshData.PrimitiveIndices.size());
 		primitiveIndices = StructuredBuffer::MakeUnique();
 		N_RETURN(primitiveIndices->Create(m_device, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.push_back(nullptr);
 
-		N_RETURN(primitiveIndices->Upload(pCommandList, uploaders.back(), mesh.PrimitiveIndices.data(), stride * numElements, 0,
+		N_RETURN(primitiveIndices->Upload(pCommandList, uploaders.back(), meshData.PrimitiveIndices.data(), stride * numElements, 0,
 			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
 	{
-		auto& uniqueVertexIndices = m_uniqueVertexIndices[i];
+		auto& uniqueVertexIndices = mesh.UniqueVertexIndices;
 		uniqueVertexIndices = RawBuffer::MakeUnique();
-		const auto byteWidth = mesh.UniqueVertexIndices.size();
+		const auto byteWidth = meshData.UniqueVertexIndices.size();
 		N_RETURN(uniqueVertexIndices->Create(m_device, byteWidth, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.push_back(nullptr);
 
-		N_RETURN(uniqueVertexIndices->Upload(pCommandList, uploaders.back(), mesh.UniqueVertexIndices.data(), byteWidth, 0,
+		N_RETURN(uniqueVertexIndices->Upload(pCommandList, uploaders.back(), meshData.UniqueVertexIndices.data(), byteWidth, 0,
 			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
+	}
+
+	{
+		auto& meshletCullData = mesh.MeshletCullData;
+		const uint32_t stride = sizeof(CullData);
+		const auto numElements = static_cast<uint32_t>(meshData.CullingData.size());
+		meshletCullData = StructuredBuffer::MakeUnique();
+		N_RETURN(meshletCullData->Create(m_device, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		uploaders.push_back(nullptr);
+
+		N_RETURN(meshletCullData->Upload(pCommandList, uploaders.back(), meshData.CullingData.data(), stride * numElements, 0,
+			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
+	}
+
+	{
+		auto& meshInfo = mesh.MeshInfo;
+		meshInfo = ConstantBuffer::MakeUnique();
+		N_RETURN(meshInfo->Create(m_device, sizeof(MeshInfo), 1, nullptr, MemoryType::DEFAULT, L"CBMeshInfo"), false);
+		uploaders.push_back(nullptr);
+
+		MeshInfo info = {};
+		info.IndexSize = meshData.IndexSize;
+		info.MeshletCount = static_cast<uint32_t>(meshData.Meshlets.size());
+		info.LastMeshletVertCount = meshData.Meshlets.back().VertCount;
+		info.LastMeshletPrimCount = meshData.Meshlets.back().PrimCount;
+
+		N_RETURN(meshInfo->Upload(pCommandList, uploaders.back(), &info, sizeof(info)), false);
 	}
 
 	return true;
@@ -169,9 +221,9 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, uint32_t i, const Me
 bool Renderer::createPayloadBuffers()
 {
 	auto maxMeshletCount = 0u;
-	for (auto& subsets : m_subsets)
-		for (const auto& subset : subsets)
-			maxMeshletCount = (max)(subset.Count, maxMeshletCount);
+	for (auto& obj : m_sceneObjects)
+		for (auto& mesh : obj.Meshes)
+			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
 
 	struct VertexOut
 	{
@@ -199,7 +251,8 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetConstants(CONSTANTS, SizeOfInUint32(uint32_t[2]), 1, 0, Shader::MS);
+		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC, Shader::MS);
+		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC, Shader::MS);
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRVS, Shader::MS);
 		X_RETURN(m_pipelineLayouts[MESHLET_MS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
@@ -211,7 +264,8 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		// Get pipeline layout
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetConstants(CONSTANTS, SizeOfInUint32(uint32_t[2]), 1);
+		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0);
 		pipelineLayout->SetRange(UAVS, DescriptorType::UAV, 2, 0);
 		X_RETURN(m_pipelineLayouts[MESHLET_CS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
@@ -280,22 +334,22 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 
 bool Renderer::createDescriptorTables()
 {
-	const auto meshCount = static_cast<uint32_t>(m_subsets.size());
-
 	// SRVs
-	m_srvTables.resize(meshCount);
-	for (auto i = 0u; i < meshCount; ++i)
+	for (auto& obj : m_sceneObjects)
 	{
-		const Descriptor descriptors[] =
+		for (auto& mesh : obj.Meshes)
 		{
-			m_vertices[i]->GetSRV(),
-			m_meshlets[i]->GetSRV(),
-			m_uniqueVertexIndices[i]->GetSRV(),
-			m_primitiveIndices[i]->GetSRV()
-		};
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_srvTables[i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			const Descriptor descriptors[] =
+			{
+				mesh.Vertices->GetSRV(),
+				mesh.Meshlets->GetSRV(),
+				mesh.UniqueVertexIndices->GetSRV(),
+				mesh.PrimitiveIndices->GetSRV()
+			};
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+			X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		}
 	}
 
 	// Payload UAVs
@@ -338,26 +392,24 @@ void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex
 	pCommandList->SetPipelineState(m_pipelines[MESHLET_MS]);
 
 	// Record commands.
-	const auto meshCount = static_cast<uint32_t>(m_subsets.size());
-	for (auto i = 0u; i < meshCount; ++i)
+	for (auto& obj : m_sceneObjects)
 	{
-		pCommandList->SetGraphics32BitConstant(CONSTANTS, m_indexBytes[i]);
-		pCommandList->SetGraphicsDescriptorTable(SRVS, m_srvTables[i]);
+		pCommandList->SetGraphicsRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
 
-		for (const auto& subset : m_subsets[i])
+		for (auto& mesh : obj.Meshes)
 		{
-			pCommandList->SetGraphics32BitConstant(CONSTANTS, subset.Offset, 1);
-			pCommandList->DispatchMesh(subset.Count, 1, 1);
+			pCommandList->SetGraphicsRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
+			pCommandList->SetGraphicsDescriptorTable(SRVS, mesh.SrvTable);
+			pCommandList->DispatchMesh(mesh.MeshletCount, 1, 1);
 		}
 	}
 }
 
 void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 {
-	const auto meshCount = static_cast<uint32_t>(m_subsets.size());
-	for (auto i = 0u; i < meshCount; ++i)
+	for (auto& obj : m_sceneObjects)
 	{
-		for (const auto& subset : m_subsets[i])
+		for (auto& mesh : obj.Meshes)
 		{
 			// Set barriers
 			ResourceBarrier barriers[2];
@@ -367,16 +419,16 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			// Set descriptor tables
 			pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_LAYOUT]);
 			pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-			pCommandList->SetCompute32BitConstant(CONSTANTS, m_indexBytes[i]);
-			pCommandList->SetComputeDescriptorTable(SRVS, m_srvTables[i]);
+			pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
+			pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
+			pCommandList->SetComputeDescriptorTable(SRVS, mesh.SrvTable);
 			pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
 
 			// Set pipeline state
 			pCommandList->SetPipelineState(m_pipelines[MESHLET_CS]);
 
 			// Record commands.
-			pCommandList->SetCompute32BitConstant(CONSTANTS, subset.Offset, 1);
-			pCommandList->Dispatch(subset.Count, 1, 1);
+			pCommandList->Dispatch(mesh.MeshletCount, 1, 1);
 
 			// Set barriers
 			numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
@@ -394,7 +446,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			// Record commands.
 			pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
 			pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
-			pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * subset.Count, 1, 0, 0, 0);
+			pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * mesh.MeshletCount, 1, 0, 0, 0);
 		}
 	}
 }

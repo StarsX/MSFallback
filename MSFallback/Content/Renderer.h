@@ -10,12 +10,22 @@
 class Renderer
 {
 public:
+	struct ObjectDef
+	{
+		DirectX::XMFLOAT3 Position;
+		DirectX::XMFLOAT3 Rotation;
+		float    Scale;
+
+		bool     Cull;
+		bool     DrawMeshlets;
+	};
+
 	Renderer(const XUSG::Device& device);
 	virtual ~Renderer();
 
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
 		XUSG::Format rtFormat, std::vector<XUSG::Resource>& uploaders,
-		const wchar_t* fileName, const DirectX::XMFLOAT4& posScale, bool isMSSupported);
+		uint32_t objCount, const std::wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported);
 
 	void UpdateFrame(uint32_t frameIndex, DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj);
 	void Render(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex,
@@ -36,7 +46,8 @@ protected:
 	enum PipelineLayoutSlot : uint8_t
 	{
 		CBV_GLOBALS,
-		CONSTANTS,
+		CBV_MESHINFO,
+		CBV_INSTANCE,
 		SRVS,
 		UAVS
 	};
@@ -70,15 +81,28 @@ protected:
 		PS_MESHLET
 	};
 
-	struct CBGlobals
+	struct ObjectMesh
 	{
-		DirectX::XMFLOAT4X4 World;
-		DirectX::XMFLOAT4X4 WorldView;
-		DirectX::XMFLOAT4X4 WorldViewProj;
-		uint32_t DrawMeshlets;
+		XUSG::DescriptorTable SrvTable;
+		XUSG::StructuredBuffer::uptr Vertices;
+		XUSG::StructuredBuffer::uptr Meshlets;
+		XUSG::StructuredBuffer::uptr PrimitiveIndices;
+		XUSG::StructuredBuffer::uptr MeshletCullData;
+		XUSG::RawBuffer::uptr UniqueVertexIndices;
+		XUSG::ConstantBuffer::uptr MeshInfo;
+		std::vector<Subset> Subsets;
+		uint32_t MeshletCount;
 	};
 
-	bool createMeshBuffers(XUSG::CommandList* pCommandList, uint32_t i, const Mesh& mesh, std::vector<XUSG::Resource>& uploaders);
+	struct SceneObject
+	{
+		std::vector<ObjectMesh> Meshes;
+		XUSG::ConstantBuffer::uptr Instance;
+		uint32_t CbvStride;
+		DirectX::XMFLOAT3X4 World;
+	};
+
+	bool createMeshBuffers(XUSG::CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<XUSG::Resource>& uploaders);
 	bool createPayloadBuffers();
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
@@ -92,7 +116,6 @@ protected:
 	XUSG::PipelineLayout		m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
 	XUSG::Pipeline				m_pipelines[NUM_PIPELINE];
 
-	std::vector<XUSG::DescriptorTable>	m_srvTables;
 	XUSG::DescriptorTable		m_srvTable;
 	XUSG::DescriptorTable		m_uavTable;
 	XUSG::DescriptorTable		m_samplerTable;
@@ -100,10 +123,7 @@ protected:
 	XUSG::IndexBuffer::uptr		m_indexPayloads;
 	XUSG::StructuredBuffer::uptr m_vertPayloads;
 
-	std::vector<XUSG::StructuredBuffer::uptr> m_vertices;
-	std::vector<XUSG::StructuredBuffer::uptr> m_meshlets;
-	std::vector<XUSG::StructuredBuffer::uptr> m_primitiveIndices;
-	std::vector<XUSG::RawBuffer::uptr> m_uniqueVertexIndices;
+	std::vector<SceneObject>	m_sceneObjects;
 
 	XUSG::DepthStencil::uptr	m_depth;
 
@@ -117,8 +137,5 @@ protected:
 	XUSG::PipelineLayoutCache::uptr			m_pipelineLayoutCache;
 	XUSG::DescriptorTableCache::uptr		m_descriptorTableCache;
 
-	DirectX::XMFLOAT2				m_viewport;
-	DirectX::XMFLOAT4				m_posScale;
-	std::vector<std::vector<Subset>> m_subsets;
-	std::vector<uint32_t>			m_indexBytes;
+	DirectX::XMFLOAT2			m_viewport;
 };

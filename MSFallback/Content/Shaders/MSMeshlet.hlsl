@@ -2,49 +2,10 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#include "MeshletCommon.hlsli"
+
 #define MAX_PRIM_COUNT	126
 #define MAX_VERT_COUNT	64
-
-struct Vertex
-{
-	float3 Position;
-	float3 Normal;
-};
-
-struct VertexOut
-{
-	float4 PositionHS   : SV_POSITION;
-	float3 PositionVS   : POSITION;
-	float3 Normal       : NORMAL;
-	uint   MeshletIndex : COLOR;
-};
-
-struct Meshlet
-{
-	uint VertCount;
-	uint VertOffset;
-	uint PrimCount;
-	uint PrimOffset;
-};
-
-cbuffer Constants
-{
-	float4x4 Globals_World;
-	float4x4 Globals_WorldView;
-	float4x4 Globals_WorldViewProj;
-	uint     Globals_DrawMeshlets;
-};
-
-cbuffer MeshInfo
-{
-	uint MeshInfo_IndexBytes;
-	uint MeshInfo_MeshletOffset;
-}
-
-StructuredBuffer<Vertex>  Vertices;
-StructuredBuffer<Meshlet> Meshlets;
-ByteAddressBuffer         UniqueVertexIndices;
-StructuredBuffer<uint>    PrimitiveIndices;
 
 /////
 // Data Loaders
@@ -63,19 +24,19 @@ uint GetVertexIndex(Meshlet m, uint localIndex)
 {
 	localIndex = m.VertOffset + localIndex;
 
-	if (MeshInfo_IndexBytes == 4) // 32-bit Vertex Indices
+	if (MeshInfo.IndexSize == 4) // 32-bit Vertex Indices
 	{
 		return UniqueVertexIndices.Load(localIndex * 4);
 	}
 	else // 16-bit Vertex Indices
 	{
 		// Byte address must be 4-byte aligned.
-		uint wordOffset = (localIndex & 0x1);
-		uint byteOffset = (localIndex / 2) * 4;
+		const uint wordOffset = (localIndex & 0x1);
+		const uint byteOffset = (localIndex / 2) * 4;
 
 		// Grab the pair of 16-bit indices, shift & mask off proper 16-bits.
-		uint indexPair = UniqueVertexIndices.Load(byteOffset);
-		uint index = (indexPair >> (wordOffset * 16)) & 0xffff;
+		const uint indexPair = UniqueVertexIndices.Load(byteOffset);
+		const uint index = (indexPair >> (wordOffset * 16)) & 0xffff;
 
 		return index;
 	}
@@ -85,10 +46,12 @@ VertexOut GetVertexAttributes(uint meshletIndex, uint vertexIndex)
 {
 	Vertex v = Vertices[vertexIndex];
 
+	const float4 positionWS = { mul(float4(v.Position, 1.0), Instance.World), 1.0 };
+
 	VertexOut vout;
-	vout.PositionVS = mul(float4(v.Position, 1), Globals_WorldView).xyz;
-	vout.PositionHS = mul(float4(v.Position, 1), Globals_WorldViewProj);
-	vout.Normal = mul(float4(v.Normal, 0), Globals_World).xyz;
+	vout.PositionVS = mul(positionWS, Constants.View);
+	vout.PositionHS = mul(positionWS, Constants.ViewProj);
+	vout.Normal = mul(v.Normal, Instance.WorldIT);
 	vout.MeshletIndex = meshletIndex;
 
 	return vout;
@@ -96,7 +59,7 @@ VertexOut GetVertexAttributes(uint meshletIndex, uint vertexIndex)
 
 Meshlet MeshShader(uint gtid, uint gid, out uint3 tri, out VertexOut vert)
 {
-	const Meshlet m = Meshlets[MeshInfo_MeshletOffset + gid];
+	const Meshlet m = Meshlets[gid];
 
 	if (gtid < m.PrimCount) tri = GetPrimitive(m, gtid);
 

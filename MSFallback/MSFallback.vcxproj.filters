@@ -84,6 +84,9 @@
     <ClInclude Include="Common\Span.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Common\Model.h">
+      <Filter>Common\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\DXFramework.cpp">
@@ -107,8 +110,8 @@
     <ClCompile Include="MSFallback.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Content\Model.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Common\Model.cpp">
+      <Filter>Common\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -124,5 +127,16 @@
     <FxCompile Include="Content\Shaders\VSMeshlet.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Content\Shaders\MeshletAS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Content\Shaders\MeshletCommon.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Content\Shaders\MeshletUtils.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
