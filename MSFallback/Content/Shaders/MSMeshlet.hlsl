@@ -6,6 +6,9 @@
 
 #define MAX_PRIM_COUNT	126
 #define MAX_VERT_COUNT	64
+#ifndef OUT_IDX
+#define OUT_IDX(i) i
+#endif
 
 // Packs/unpacks a 10-bit index triangle primitive into/from a uint.
 uint3 UnpackPrimitive(uint primitive)
@@ -58,10 +61,34 @@ VertexOut GetVertexAttributes(uint meshletIndex, uint vertexIndex)
 	return vout;
 }
 
-Meshlet MeshShader(uint gtid, uint meshletIndex, out uint3 tri, out VertexOut vert)
+[NumThreads(128, 1, 1)]
+[OutputTopology("triangle")]
+void main(
+	uint dtid : SV_DispatchThreadID,
+	uint gtid : SV_GroupThreadID,
+	uint gid : SV_GroupID,
+#if _NATIVE_AS
+	in payload Payload payload,
+#endif
+	out vertices VertexOut verts[MAX_VERT_COUNT],
+	out indices uint3 tris[MAX_PRIM_COUNT]
+)
 {
+#if _NATIVE_AS
+	// Load the meshlet from the AS payload data
+	const uint meshletIndex = payload.MeshletIndices[gid];
+
+	// Catch any out-of-range indices (in case too many MS threadgroups were dispatched from AS)
+	if (meshletIndex >= MeshInfo.MeshletCount) return;
+#else
+	const uint meshletIndex = gid;
+#endif
+
 	// Load the meshlet
-	const Meshlet m = Meshlets[meshletIndex];
+	Meshlet m = Meshlets[meshletIndex];
+
+	// Our vertex and primitive counts come directly from the meshlet
+	SetMeshOutputCounts(m.VertCount, m.PrimCount);
 
 	//--------------------------------------------------------------------
 	// Export Primitive & Vertex Data
@@ -69,70 +96,8 @@ Meshlet MeshShader(uint gtid, uint meshletIndex, out uint3 tri, out VertexOut ve
 	if (gtid < m.VertCount)
 	{
 		const uint vertexIndex = GetVertexIndex(m, gtid);
-		vert = GetVertexAttributes(meshletIndex, vertexIndex);
+		verts[OUT_IDX(gtid)] = GetVertexAttributes(meshletIndex, vertexIndex);
 	}
 
-	if (gtid < m.PrimCount) tri = GetPrimitive(m, gtid);
-
-	return m;
+	if (gtid < m.PrimCount) tris[OUT_IDX(gtid)] = GetPrimitive(m, gtid);
 }
-
-#if _NATIVE_MS
-[NumThreads(128, 1, 1)]
-[OutputTopology("triangle")]
-void main(
-	uint gtid : SV_GroupThreadID,
-	uint gid : SV_GroupID,
-	out indices uint3 tris[MAX_PRIM_COUNT],
-	out vertices VertexOut verts[MAX_VERT_COUNT]
-)
-{
-	// Load the meshlet
-	uint3 tri;
-	VertexOut vert = (VertexOut)0;
-	const Meshlet m = MeshShader(gtid, gid, tri, vert);
-
-	// Our vertex and primitive counts come directly from the meshlet
-	SetMeshOutputCounts(m.VertCount, m.PrimCount);
-
-	//--------------------------------------------------------------------
-	// Export Primitive & Vertex Data
-
-	if (gtid < m.VertCount) verts[gtid] = vert;
-	if (gtid < m.PrimCount) tris[gtid] = tri;
-}
-#endif
-
-#if _NATIVE_AS
-[NumThreads(128, 1, 1)]
-[OutputTopology("triangle")]
-void main(
-	uint dtid : SV_DispatchThreadID,
-	uint gtid : SV_GroupThreadID,
-	uint gid : SV_GroupID,
-	in payload Payload payload,
-	out vertices VertexOut verts[MAX_VERT_COUNT],
-	out indices uint3 tris[MAX_PRIM_COUNT]
-)
-{
-	// Load the meshlet from the AS payload data
-	const uint meshletIndex = payload.MeshletIndices[gid];
-
-	// Catch any out-of-range indices (in case too many MS threadgroups were dispatched from AS)
-	if (meshletIndex >= MeshInfo.MeshletCount) return;
-
-	// Load the meshlet
-	uint3 tri;
-	VertexOut vert = (VertexOut)0;
-	const Meshlet m = MeshShader(gtid, meshletIndex, tri, vert);
-
-	// Our vertex and primitive counts come directly from the meshlet
-	SetMeshOutputCounts(m.VertCount, m.PrimCount);
-
-	//--------------------------------------------------------------------
-	// Export Primitive & Vertex Data
-
-	if (gtid < m.VertCount) verts[gtid] = vert;
-	if (gtid < m.PrimCount) tris[gtid] = tri;
-}
-#endif

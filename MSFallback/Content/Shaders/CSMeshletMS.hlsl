@@ -2,17 +2,34 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+struct MeshOutCounts
+{
+	uint VertCount;
+	uint PrimCount;
+};
+
+#define main MSMain
+#define vertices MeshOutCounts moc, out
+#define indices
+#define SetMeshOutputCounts(vertCount, primCount) { moc.VertCount = vertCount; moc.PrimCount = primCount; }
+#define OUT_IDX(i) 0
 #include "MSMeshlet.hlsl"
+#undef OUT_IDX
+#undef indices
+#undef SetMeshOutputCounts
+#undef vertices
+#undef main
 
 RWStructuredBuffer<VertexOut> VertexPayloads;
 RWBuffer<uint> IndexPayloads;
 
 [numthreads(128, 1, 1)]
-void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
+void main(uint dtid : SV_DispatchThreadID, uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 {
-	uint3 tri;
-	VertexOut vert = (VertexOut)0;
-	const Meshlet m = MeshShader(gtid, gid, tri, vert);
+	VertexOut verts[MAX_VERT_COUNT];
+	uint3 tris[MAX_PRIM_COUNT];
+	MeshOutCounts moc = (MeshOutCounts)0;
+	MSMain(dtid, gtid, gid, moc, verts, tris);
 
 	if (gtid < MAX_PRIM_COUNT)
 	{
@@ -21,8 +38,8 @@ void main(uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 
 		[unroll]
 		for (uint i = 0; i < 3; ++i)
-			IndexPayloads[baseAddr + i] = gtid < m.PrimCount ? baseIdx + tri[i] : 0xffffffff;
+			IndexPayloads[baseAddr + i] = gtid < moc.PrimCount ? baseIdx + tris[0][i] : 0xffffffff;
 	}
 
-	if (gtid < m.VertCount) VertexPayloads[MAX_VERT_COUNT * gid + gtid] = vert;
+	if (gtid < moc.VertCount) VertexPayloads[MAX_VERT_COUNT * gid + gtid] = verts[0];
 }
