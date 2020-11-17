@@ -246,20 +246,21 @@ bool Renderer::createPayloadBuffers()
 
 bool Renderer::createPipelineLayouts(bool isMSSupported)
 {
-	// Mesh-shader
+	// Native mesh-shader
 	if (isMSSupported)
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC, Shader::MS);
-		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC, Shader::MS);
+		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRVS, Shader::MS);
+		pipelineLayout->SetRootSRV(SRVS + 1, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
 		X_RETURN(m_pipelineLayouts[MESHLET_MS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"MSMeshletLayout"), false);
 	}
 
-	// Fallback compute-shader
+	// Compute-shader fallback for mesh shader
 	{
 		// Get pipeline layout
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
@@ -272,7 +273,7 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 			PipelineLayoutFlag::NONE, L"CSMeshletLayout"), false);
 	}
 
-	// Fallback vertex-shader
+	// Vertex-shader fallback for mesh shader
 	{
 		// Get pipeline layout
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
@@ -290,13 +291,15 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 {
 	N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
 
-	// Mesh-shader
+	// Native mesh-shader
 	if (isMSSupported)
 	{
+		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
 
 		const auto state = MeshShader::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_MS_LAYOUT]);
+		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
 		state->SetShader(Shader::Stage::MS, m_shaderPool->GetShader(Shader::Stage::MS, MS_MESHLET));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_MESHLET));
 		state->OMSetNumRenderTargets(1);
@@ -305,17 +308,17 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 		X_RETURN(m_pipelines[MESHLET_MS], state->GetPipeline(*m_meshShaderPipelineCache, L"MeshShaderMeshlet"), false);
 	}
 
-	// Fallback compute-shader
+	// Compute-shader fallback for mesh shader
 	{
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET, L"CSMeshlet.cso"), false);
+		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
 
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_CS_LAYOUT]);
-		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET));
+		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_MS));
 		X_RETURN(m_pipelines[MESHLET_CS], state->GetPipeline(*m_computePipelineCache, L"ComputeShaderMeshlet"), false);
 	}
 
-	// Fallback vertex-shader
+	// Vertex-shader fallback for mesh shader
 	{
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
 		
@@ -400,7 +403,8 @@ void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex
 		{
 			pCommandList->SetGraphicsRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 			pCommandList->SetGraphicsDescriptorTable(SRVS, mesh.SrvTable);
-			pCommandList->DispatchMesh(mesh.MeshletCount, 1, 1);
+			pCommandList->SetGraphicsRootShaderResourceView(SRVS + 1, mesh.MeshletCullData->GetResource());
+			pCommandList->DispatchMesh(DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE), 1, 1);
 		}
 	}
 }

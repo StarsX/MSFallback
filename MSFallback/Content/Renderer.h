@@ -63,12 +63,18 @@ protected:
 
 	enum ComputeShaderID : uint8_t
 	{
-		CS_MESHLET
+		CS_MESHLET_AS,
+		CS_MESHLET_MS
 	};
 
 	enum VertexShaderID : uint8_t
 	{
 		VS_MESHLET
+	};
+
+	enum AmplificationShaderID : uint8_t
+	{
+		AS_MESHLET
 	};
 
 	enum MeshShaderID : uint8_t

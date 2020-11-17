@@ -121,13 +121,13 @@
     <FxCompile Include="Content\Shaders\MSMeshlet.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\CSMeshlet.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="Content\Shaders\VSMeshlet.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Content\Shaders\MeshletAS.hlsl">
+    <FxCompile Include="Content\Shaders\ASMeshlet.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\CSMeshletMS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
