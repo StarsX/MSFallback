@@ -15,8 +15,8 @@ struct MeshOutCounts
 #define OUT_IDX(i) 0
 #include "MSMeshlet.hlsl"
 #undef OUT_IDX
-#undef indices
 #undef SetMeshOutputCounts
+#undef indices
 #undef vertices
 #undef main
 
