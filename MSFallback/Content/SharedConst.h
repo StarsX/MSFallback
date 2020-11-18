@@ -8,6 +8,9 @@
 static const float g_zNear = 1.0f;
 static const float g_zFar = 400.0f;
 
+#define MAX_PRIM_COUNT	126
+#define MAX_VERT_COUNT	64
+
 //*********************************************************
 //
 // Copyright (c) Microsoft. All rights reserved.

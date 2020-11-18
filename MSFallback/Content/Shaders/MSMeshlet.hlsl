@@ -4,8 +4,8 @@
 
 #include "MeshletCommon.hlsli"
 
-#define MAX_PRIM_COUNT	126
-#define MAX_VERT_COUNT	64
+#define MS_GROUP_SIZE 128
+
 #ifndef OUT_IDX
 #define OUT_IDX(i) i
 #endif
@@ -61,7 +61,7 @@ VertexOut GetVertexAttributes(uint meshletIndex, uint vertexIndex)
 	return vout;
 }
 
-[NumThreads(128, 1, 1)]
+[NumThreads(MS_GROUP_SIZE, 1, 1)]
 [OutputTopology("triangle")]
 void main(
 	uint dtid : SV_DispatchThreadID,

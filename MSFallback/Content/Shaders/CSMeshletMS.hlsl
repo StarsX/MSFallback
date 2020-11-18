@@ -23,7 +23,7 @@ struct MeshOutCounts
 RWStructuredBuffer<VertexOut> VertexPayloads;
 RWBuffer<uint> IndexPayloads;
 
-[numthreads(128, 1, 1)]
+[numthreads(MS_GROUP_SIZE, 1, 1)]
 void main(uint dtid : SV_DispatchThreadID, uint gtid : SV_GroupThreadID, uint gid : SV_GroupID)
 {
 	VertexOut verts[MAX_VERT_COUNT];

@@ -5,9 +5,6 @@
 #include "SharedConst.h"
 #include "Renderer.h"
 
-#define MAX_PRIM_COUNT	126
-#define MAX_VERT_COUNT	64
-
 using namespace std;
 using namespace DirectX;
 using namespace XUSG;
