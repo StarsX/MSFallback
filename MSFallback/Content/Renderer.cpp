@@ -85,14 +85,46 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	return true;
 }
 
-void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, CXMMATRIX proj)
+void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, const DirectX::XMMATRIX* pProj, const XMFLOAT3& eyePt)
 {
 	// Global constants
 	{
+		// Calculate the debug camera's properties to extract plane data.
+		const auto aspectRatio = m_viewport.x / m_viewport.y;
+		const auto cullFocusDir = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+		const auto cullEyePt = XMVectorSet(0.0f, 10.0f, 21.0f, 1.0f);
+		const auto cullView = XMMatrixLookToRH(cullEyePt, cullFocusDir, XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
+		const auto cullProj = XMMatrixPerspectiveFovRH(XM_PI / 3.0f, aspectRatio, g_zNear, g_zFar);
+
+		// Extract the planes from the debug camera view-projection matrix.
+		const auto vp = XMMatrixTranspose(cullView * cullProj);
+		const XMVECTOR planes[6] =
+		{
+			XMPlaneNormalize(vp.r[3] + vp.r[0]), // Left
+			XMPlaneNormalize(vp.r[3] - vp.r[0]), // Right
+			XMPlaneNormalize(vp.r[3] + vp.r[1]), // Bottom
+			XMPlaneNormalize(vp.r[3] - vp.r[1]), // Top
+			XMPlaneNormalize(vp.r[2]),           // Near
+			XMPlaneNormalize(vp.r[3] - vp.r[2]), // Far
+		};
+
+		const auto mainView = pProj ? view : cullView;
+		const auto& proj = pProj ? *pProj : cullProj;
+
+		// Set constant data to be read by the shaders.
 		const auto pCbData = reinterpret_cast<Constants*>(m_cbGlobals->Map(frameIndex));
-		XMStoreFloat3x4(&pCbData->View, view); // XMStoreFloat3x4 includes transpose.
-		XMStoreFloat4x4(&pCbData->ViewProj, XMMatrixTranspose(view * proj));
+
+		pCbData->ViewPosition = eyePt;
+		pCbData->HighlightedIndex = -1;
+		pCbData->SelectedIndex = -1;
 		pCbData->DrawMeshlets = true;
+
+		XMStoreFloat3x4(&pCbData->View, mainView); // XMStoreFloat3x4 includes transpose.
+		XMStoreFloat4x4(&pCbData->ViewProj, XMMatrixTranspose(mainView * proj));
+		XMStoreFloat3(&pCbData->CullViewPosition, cullEyePt);
+
+		for (uint32_t i = 0; i < size(planes); ++i)
+			XMStoreFloat4(&pCbData->Planes[i], planes[i]);
 	}
 
 	// Per instance
@@ -104,7 +136,7 @@ void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, CXMMATRIX proj)
 		XMMatrixDecompose(&scale, &rot, &pos, world);
 
 		const auto pCbData = reinterpret_cast<Instance*>(obj.Instance->Map(frameIndex));
-		XMStoreFloat3x4(&pCbData->World, world); // XMStoreFloat3x4 includes transpose.
+		XMStoreFloat4x4(&pCbData->World, XMMatrixTranspose(world));
 		XMStoreFloat3x4(&pCbData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 		pCbData->Scale = XMVectorGetX(scale);
 		pCbData->Flags = CULL_FLAG | MESHLET_FLAG;

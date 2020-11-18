@@ -6,7 +6,7 @@
 //#define CORN_FLOWER_BLUE	0.392156899, 0.584313750, 0.929411829
 
 static const float g_zNear = 1.0f;
-static const float g_zFar = 400.0f;
+static const float g_zFar = 300.0f;
 
 #define MAX_PRIM_COUNT	126
 #define MAX_VERT_COUNT	64
@@ -43,8 +43,8 @@ _declspec(align(256u))
 #endif
 struct Instance
 {
-	float4x3 World;
-	float3x3 WorldIT;
+	float4x4 World;
+	float4x3 WorldIT;
 	float    Scale;
 	uint     Flags;
 };

@@ -24,6 +24,7 @@ MSFallback::MSFallback(uint32_t width, uint32_t height, std::wstring name) :
 	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height)),
 	m_isMSSupported(false),
 	m_useMeshShader(false),
+	m_useDebugCamera(false),
 	m_showFPS(true),
 	m_pausing(false),
 	m_tracking(false),
@@ -204,7 +205,7 @@ void MSFallback::OnUpdate()
 	//const auto eyePt = XMLoadFloat3(&m_eyePt);
 	const auto view = XMLoadFloat4x4(&m_view);
 	const auto proj = XMLoadFloat4x4(&m_proj);
-	m_renderer->UpdateFrame(m_frameIndex, view, proj);
+	m_renderer->UpdateFrame(m_frameIndex, view, m_useDebugCamera ? nullptr : &proj, m_eyePt);
 }
 
 // Render the scene.
@@ -244,6 +245,9 @@ void MSFallback::OnKeyUp(uint8_t key)
 		break;
 	case 'P':
 		m_useMeshShader = !m_useMeshShader && m_isMSSupported;
+		break;
+	case 'C':
+		m_useDebugCamera = !m_useDebugCamera;
 		break;
 	}
 }
@@ -416,6 +420,7 @@ double MSFallback::CalculateFrameStats(float* pTimeStep)
 		if (m_showFPS) windowText << setprecision(2) << fixed << fps;
 		else windowText << L"[F1]";
 		windowText << L"    [P] " << (m_useMeshShader ? "Mesh-shader pipeline" : "Fallback pipelines");
+		windowText << L"    [C] " << (m_useDebugCamera ? "Culling camera" : "Third-person camera");
 		SetCustomWindowText(windowText.str().c_str());
 	}
 

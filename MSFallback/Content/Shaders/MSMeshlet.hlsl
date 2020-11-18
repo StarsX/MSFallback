@@ -50,12 +50,12 @@ VertexOut GetVertexAttributes(uint meshletIndex, uint vertexIndex)
 {
 	Vertex v = Vertices[vertexIndex];
 
-	const float4 positionWS = { mul(float4(v.Position, 1.0), Instance.World), 1.0 };
+	const float4 positionWS = mul(float4(v.Position, 1.0), Instance.World);
 
 	VertexOut vout;
 	vout.PositionVS = mul(positionWS, Constants.View);
 	vout.PositionHS = mul(positionWS, Constants.ViewProj);
-	vout.Normal = mul(v.Normal, Instance.WorldIT);
+	vout.Normal = mul(v.Normal, (float3x3)Instance.WorldIT);
 	vout.MeshletIndex = meshletIndex;
 
 	return vout;

@@ -75,6 +75,7 @@ private:
 
 	// Application state
 	bool		m_useMeshShader;
+	bool		m_useDebugCamera;
 	bool		m_showFPS;
 	bool		m_pausing;
 	StepTimer	m_timer;

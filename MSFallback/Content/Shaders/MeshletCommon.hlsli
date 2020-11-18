@@ -38,5 +38,5 @@ float3 RotateVector(float3 v0, float3 axis, float angle)
 {
 	const float cs = cos(angle);
 
-	return cs * v0 + sin(angle) * cross(axis, v0) + (1 - cs) * dot(axis, v0) * axis;
+	return cs * v0 + sin(angle) * cross(axis, v0) + (1.0 - cs) * dot(axis, v0) * axis;
 }
