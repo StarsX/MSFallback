@@ -8,13 +8,17 @@ struct MeshOutCounts
 	uint PrimCount;
 };
 
+StructuredBuffer<uint> DispatchMeshArgs : register (t5);
+
 #define SetMeshOutputCounts(vertCount, primCount) \
 { \
 	moc.VertCount = vertCount; \
 	moc.PrimCount = primCount; \
 }
 
+#define GET_MESHLET_IDX(i) DispatchMeshArgs[i]
 #define OUT_IDX(i) 0
+#define indices
 #define vertices MeshOutCounts moc, out
 #define indices
 
@@ -30,8 +34,9 @@ void main(uint dtid : SV_DispatchThreadID, uint gtid : SV_GroupThreadID, uint gi
 {
 	VertexOut verts[MAX_VERT_COUNT];
 	uint3 tris[MAX_PRIM_COUNT];
+	Payload payload = (Payload)0;
 	MeshOutCounts moc = (MeshOutCounts)0;
-	MSMain(dtid, gtid, gid, moc, verts, tris);
+	MSMain(dtid, gtid, gid, payload, moc, verts, tris);
 
 	if (gtid < MAX_PRIM_COUNT)
 	{

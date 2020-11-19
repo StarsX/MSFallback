@@ -51,7 +51,8 @@ protected:
 		CBV_MESHINFO,
 		CBV_INSTANCE,
 		SRVS,
-		UAVS
+		UAVS,
+		SRV_AS_PAYLOADS
 	};
 
 	enum PipelineIndex : uint8_t
@@ -128,12 +129,12 @@ protected:
 	XUSG::CommandLayout			m_commandLayout;
 
 	XUSG::DescriptorTable		m_srvTable;
-	XUSG::DescriptorTable		m_uavTable;
+	std::vector<XUSG::DescriptorTable> m_uavTables;
 	XUSG::DescriptorTable		m_samplerTable;
 
 	XUSG::IndexBuffer::uptr		m_indexPayloads;
 	XUSG::StructuredBuffer::uptr m_vertPayloads;
-	XUSG::RawBuffer::uptr		m_dispatchPayloads;
+	XUSG::StructuredBuffer::uptr m_dispatchPayloads;
 
 	std::vector<SceneObject>	m_sceneObjects;
 

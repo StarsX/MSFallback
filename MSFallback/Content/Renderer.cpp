@@ -257,28 +257,45 @@ bool Renderer::createPayloadBuffers()
 		for (auto& mesh : obj.Meshes)
 			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
 
-	struct VertexOut
+	const auto uavCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
+	m_uavTables.resize(uavCount);
+
 	{
-		float PositionHS[4];
-		float PositionVS[3];
-		float Normal[3];
-		uint32_t MeshletIndex;
-	};
+		struct VertexOut
+		{
+			float PositionHS[4];
+			float PositionVS[3];
+			float Normal[3];
+			uint32_t MeshletIndex;
+		};
 
-	m_vertPayloads = StructuredBuffer::MakeUnique();
-	N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, L"VertexPayloads"), false);
+		vector<uint32_t> firstUavElements(uavCount);
+		for (auto i = 0u; i < uavCount; ++i) firstUavElements[i] = MAX_VERT_COUNT * AS_GROUP_SIZE * i;
 
-	m_indexPayloads = IndexBuffer::MakeUnique();
-	N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t) * 3 * MAX_PRIM_COUNT * maxMeshletCount,
-		Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
+		m_vertPayloads = StructuredBuffer::MakeUnique();
+		N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+			1, nullptr, uavCount, firstUavElements.data(), L"VertexPayloads"), false);
+	}
 
-	m_dispatchPayloads = RawBuffer::MakeUnique();
-	N_RETURN(m_dispatchPayloads->Create(m_device, sizeof(DispatchArgs) * DIV_UP(maxMeshletCount, AS_GROUP_SIZE),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-		1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
+	{
+		vector<uint32_t> firstUavElements(uavCount);
+		for (auto i = 0u; i < uavCount; ++i) firstUavElements[i] = 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i;
+
+		m_indexPayloads = IndexBuffer::MakeUnique();
+		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
+			Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+			1, nullptr, 1, nullptr, uavCount, firstUavElements.data(), L"IndexPayloads"), false);
+	}
+
+	{
+		m_dispatchPayloads = StructuredBuffer::MakeUnique();
+		const uint32_t stride = sizeof(uint32_t);
+		const uint32_t numElements = sizeof(DispatchArgs) / stride * DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
+		N_RETURN(m_dispatchPayloads->Create(m_device, numElements, stride,
+			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+			1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
+	}
 
 	return true;
 }
@@ -321,6 +338,7 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0);
 		pipelineLayout->SetRange(UAVS, DescriptorType::UAV, 2, 0);
+		pipelineLayout->SetRootSRV(SRV_AS_PAYLOADS, 5);
 		X_RETURN(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"CSForMSMeshletLayout"), false);
 	}
@@ -426,15 +444,17 @@ bool Renderer::createDescriptorTables()
 	}
 
 	// Payload UAVs
+	const auto uavCount = static_cast<uint32_t>(m_uavTables.size());
+	for (auto i = 0u; i < uavCount; ++i)
 	{
 		const Descriptor descriptors[] =
 		{
-			m_vertPayloads->GetUAV(),
-			m_indexPayloads->GetUAV()
+			m_vertPayloads->GetUAV(i),
+			m_indexPayloads->GetUAV(i)
 		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_uavTables[i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	// Payload SRVs
@@ -485,42 +505,73 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 	{
 		for (auto& mesh : obj.Meshes)
 		{
+			// Set barrier
+			ResourceBarrier barriers[3];
+			auto numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
+
+			const auto dispatchCount = DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE);
+
+			// Amplification fallback
+			{
+				// Set descriptor tables
+				pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_AS_LAYOUT]);
+				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
+				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
+				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
+				pCommandList->SetComputeRootShaderResourceView(SRVS, mesh.MeshletCullData->GetResource());
+				pCommandList->SetComputeRootUnorderedAccessView(UAVS, m_dispatchPayloads->GetResource());
+
+				// Set pipeline state
+				pCommandList->SetPipelineState(m_pipelines[MESHLET_CS_FOR_AS]);
+
+				// Record commands.
+				pCommandList->Dispatch(dispatchCount, 1, 1);
+			}
+
 			// Set barriers
-			ResourceBarrier barriers[2];
-			auto numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
+			numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+			numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::INDIRECT_ARGUMENT, numBarriers);
 
-			// Set descriptor tables
-			pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT]);
-			pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-			pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
-			pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
-			pCommandList->SetComputeDescriptorTable(SRVS, mesh.SrvTable);
-			pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
+			// Mesh-shader fallback
+			{
+				// Set descriptor tables
+				pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT]);
+				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
+				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
+				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
+				pCommandList->SetComputeDescriptorTable(SRVS, mesh.SrvTable);
 
-			// Set pipeline state
-			pCommandList->SetPipelineState(m_pipelines[MESHLET_CS_FOR_MS]);
+				// Set pipeline state
+				pCommandList->SetPipelineState(m_pipelines[MESHLET_CS_FOR_MS]);
 
-			// Record commands.
-			pCommandList->Dispatch(mesh.MeshletCount, 1, 1);
+				// Record commands.
+				for (auto i = 0u; i < dispatchCount; ++i)
+				{
+					const int baseOffset = sizeof(DispatchArgs) * i;
+					pCommandList->SetComputeDescriptorTable(UAVS, m_uavTables[i]);
+					pCommandList->SetComputeRootShaderResourceView(SRV_AS_PAYLOADS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
+					pCommandList->ExecuteIndirect(m_commandLayout, 1, m_dispatchPayloads->GetResource(), baseOffset);
+				}
 
-			// Set barriers
-			numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
-			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::INDEX_BUFFER, numBarriers);
-			pCommandList->Barrier(numBarriers, barriers);
+				// Set barriers
+				numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
+				numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::INDEX_BUFFER, numBarriers);
+				pCommandList->Barrier(numBarriers, barriers);
 
-			// Set descriptor tables
-			pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[MESHLET_VS_LAYOUT]);
-			pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-			pCommandList->SetGraphicsDescriptorTable(1, m_srvTable);
+				// Set descriptor tables
+				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[MESHLET_VS_LAYOUT]);
+				pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
+				pCommandList->SetGraphicsDescriptorTable(1, m_srvTable);
 
-			// Set pipeline state
-			pCommandList->SetPipelineState(m_pipelines[MESHLET_VS]);
+				// Set pipeline state
+				pCommandList->SetPipelineState(m_pipelines[MESHLET_VS]);
 
-			// Record commands.
-			pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-			pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
-			pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * mesh.MeshletCount, 1, 0, 0, 0);
+				// Record commands.
+				pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
+				pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
+				pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * mesh.MeshletCount, 1, 0, 0, 0);
+			}
 		}
 	}
 }

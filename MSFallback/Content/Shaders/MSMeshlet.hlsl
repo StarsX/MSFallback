@@ -10,6 +10,10 @@
 #define OUT_IDX(i) i
 #endif
 
+#ifndef GET_MESHLET_IDX
+#define GET_MESHLET_IDX(i) payload.MeshletIndices[i]
+#endif
+
 // Packs/unpacks a 10-bit index triangle primitive into/from a uint.
 uint3 UnpackPrimitive(uint primitive)
 {
@@ -67,22 +71,16 @@ void main(
 	uint dtid : SV_DispatchThreadID,
 	uint gtid : SV_GroupThreadID,
 	uint gid : SV_GroupID,
-#if _NATIVE_AS
 	in payload Payload payload,
-#endif
 	out vertices VertexOut verts[MAX_VERT_COUNT],
 	out indices uint3 tris[MAX_PRIM_COUNT]
 )
 {
-#if _NATIVE_AS
 	// Load the meshlet from the AS payload data
-	const uint meshletIndex = payload.MeshletIndices[gid];
+	const uint meshletIndex = GET_MESHLET_IDX(gid);
 
 	// Catch any out-of-range indices (in case too many MS threadgroups were dispatched from AS)
 	if (meshletIndex >= MeshInfo.MeshletCount) return;
-#else
-	const uint meshletIndex = gid;
-#endif
 
 	// Load the meshlet
 	Meshlet m = Meshlets[meshletIndex];

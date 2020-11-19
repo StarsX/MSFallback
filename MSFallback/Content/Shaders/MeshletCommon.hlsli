@@ -31,7 +31,7 @@ StructuredBuffer<Vertex>	Vertices;
 StructuredBuffer<Meshlet>	Meshlets;
 ByteAddressBuffer			UniqueVertexIndices;
 StructuredBuffer<uint>		PrimitiveIndices;
-StructuredBuffer<CullData>	MeshletCullData : register(t4);
+StructuredBuffer<CullData>	MeshletCullData : register (t4);
 
 // Rotates a vector, v0, about an axis by some angle
 float3 RotateVector(float3 v0, float3 axis, float angle)
