@@ -129,7 +129,7 @@ protected:
 	XUSG::CommandLayout			m_commandLayout;
 
 	XUSG::DescriptorTable		m_srvTable;
-	std::vector<XUSG::DescriptorTable> m_uavTables;
+	XUSG::DescriptorTable		m_uavTable;
 	XUSG::DescriptorTable		m_samplerTable;
 
 	XUSG::IndexBuffer::uptr		m_indexPayloads;

@@ -257,9 +257,6 @@ bool Renderer::createPayloadBuffers()
 		for (auto& mesh : obj.Meshes)
 			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
 
-	const auto uavCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
-	m_uavTables.resize(uavCount);
-
 	{
 		struct VertexOut
 		{
@@ -269,23 +266,17 @@ bool Renderer::createPayloadBuffers()
 			uint32_t MeshletIndex;
 		};
 
-		vector<uint32_t> firstUavElements(uavCount);
-		for (auto i = 0u; i < uavCount; ++i) firstUavElements[i] = MAX_VERT_COUNT * AS_GROUP_SIZE * i;
-
 		m_vertPayloads = StructuredBuffer::MakeUnique();
 		N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, uavCount, firstUavElements.data(), L"VertexPayloads"), false);
+			1, nullptr, 1, nullptr, L"VertexPayloads"), false);
 	}
 
 	{
-		vector<uint32_t> firstUavElements(uavCount);
-		for (auto i = 0u; i < uavCount; ++i) firstUavElements[i] = 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i;
-
 		m_indexPayloads = IndexBuffer::MakeUnique();
 		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
 			Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, uavCount, firstUavElements.data(), L"IndexPayloads"), false);
+			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
 
 	{
@@ -444,17 +435,15 @@ bool Renderer::createDescriptorTables()
 	}
 
 	// Payload UAVs
-	const auto uavCount = static_cast<uint32_t>(m_uavTables.size());
-	for (auto i = 0u; i < uavCount; ++i)
 	{
 		const Descriptor descriptors[] =
 		{
-			m_vertPayloads->GetUAV(i),
-			m_indexPayloads->GetUAV(i)
+			m_vertPayloads->GetUAV(),
+			m_indexPayloads->GetUAV()
 		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_uavTables[i], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	// Payload SRVs
@@ -541,6 +530,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
 				pCommandList->SetComputeDescriptorTable(SRVS, mesh.SrvTable);
+				pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
 
 				// Set pipeline state
 				pCommandList->SetPipelineState(m_pipelines[MESHLET_CS_FOR_MS]);
@@ -549,7 +539,6 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				for (auto i = 0u; i < dispatchCount; ++i)
 				{
 					const int baseOffset = sizeof(DispatchArgs) * i;
-					pCommandList->SetComputeDescriptorTable(UAVS, m_uavTables[i]);
 					pCommandList->SetComputeRootShaderResourceView(SRV_AS_PAYLOADS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
 					pCommandList->ExecuteIndirect(m_commandLayout, 1, m_dispatchPayloads->GetResource(), baseOffset);
 				}

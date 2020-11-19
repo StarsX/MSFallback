@@ -38,15 +38,18 @@ void main(uint dtid : SV_DispatchThreadID, uint gtid : SV_GroupThreadID, uint gi
 	MeshOutCounts moc = (MeshOutCounts)0;
 	MSMain(dtid, gtid, gid, payload, moc, verts, tris);
 
+	// Load the meshlet from the AS payload data
+	const uint meshletIndex = DispatchMeshArgs[gid];
+
 	if (gtid < MAX_PRIM_COUNT)
 	{
-		const uint baseAddr = 3 * (MAX_PRIM_COUNT * gid + gtid);
-		const uint baseIdx = MAX_VERT_COUNT * gid;
+		const uint baseAddr = 3 * (MAX_PRIM_COUNT * meshletIndex + gtid);
+		const uint baseIdx = MAX_VERT_COUNT * meshletIndex;
 
 		[unroll]
 		for (uint i = 0; i < 3; ++i)
 			IndexPayloads[baseAddr + i] = gtid < moc.PrimCount ? baseIdx + tris[0][i] : 0xffffffff;
 	}
 
-	if (gtid < moc.VertCount) VertexPayloads[MAX_VERT_COUNT * gid + gtid] = verts[0];
+	if (gtid < moc.VertCount) VertexPayloads[MAX_VERT_COUNT * meshletIndex + gtid] = verts[0];
 }
