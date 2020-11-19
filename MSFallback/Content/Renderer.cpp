@@ -78,6 +78,9 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	N_RETURN(createPipelines(rtFormat, m_depth->GetFormat(), isMSSupported), false);
 	N_RETURN(createDescriptorTables(), false);
 
+	// create command layout
+	N_RETURN(createCommandLayout(), false);
+
 	m_cbGlobals = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbGlobals->Create(m_device, sizeof(Constants), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
 	m_cbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(m_cbGlobals->Map(1)) - reinterpret_cast<uint8_t*>(m_cbGlobals->Map()));
@@ -264,11 +267,18 @@ bool Renderer::createPayloadBuffers()
 
 	m_vertPayloads = StructuredBuffer::MakeUnique();
 	N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+		1, nullptr, 1, nullptr, L"VertexPayloads"), false);
 
 	m_indexPayloads = IndexBuffer::MakeUnique();
 	N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t) * 3 * MAX_PRIM_COUNT * maxMeshletCount,
-		Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT), false);
+		Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+		1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
+
+	m_dispatchPayloads = RawBuffer::MakeUnique();
+	N_RETURN(m_dispatchPayloads->Create(m_device, sizeof(DispatchArgs) * DIV_UP(maxMeshletCount, AS_GROUP_SIZE),
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+		1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
 
 	return true;
 }
@@ -285,8 +295,21 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRVS, Shader::MS);
 		pipelineLayout->SetRootSRV(SRVS + 1, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
-		X_RETURN(m_pipelineLayouts[MESHLET_MS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"MSMeshletLayout"), false);
+	}
+
+	// Compute-shader fallback for amplification shader
+	{
+		// Get pipeline layout
+		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
+		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootSRV(SRVS, 4);
+		pipelineLayout->SetRootUAV(UAVS, 0);
+		X_RETURN(m_pipelineLayouts[MESHLET_CS_FOR_AS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"CSForASMeshletLayout"), false);
 	}
 
 	// Compute-shader fallback for mesh shader
@@ -298,8 +321,8 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0);
 		pipelineLayout->SetRange(UAVS, DescriptorType::UAV, 2, 0);
-		X_RETURN(m_pipelineLayouts[MESHLET_CS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
-			PipelineLayoutFlag::NONE, L"CSMeshletLayout"), false);
+		X_RETURN(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+			PipelineLayoutFlag::NONE, L"CSForMSMeshletLayout"), false);
 	}
 
 	// Vertex-shader fallback for mesh shader
@@ -327,14 +350,24 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
 
 		const auto state = MeshShader::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_MS_LAYOUT]);
+		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT]);
 		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
 		state->SetShader(Shader::Stage::MS, m_shaderPool->GetShader(Shader::Stage::MS, MS_MESHLET));
 		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_MESHLET));
 		state->OMSetNumRenderTargets(1);
 		state->OMSetRTVFormat(0, rtFormat);
 		state->OMSetDSVFormat(dsFormat);
-		X_RETURN(m_pipelines[MESHLET_MS], state->GetPipeline(*m_meshShaderPipelineCache, L"MeshShaderMeshlet"), false);
+		X_RETURN(m_pipelines[MESHLET_NATIVE], state->GetPipeline(*m_meshShaderPipelineCache, L"MeshShaderMeshlet"), false);
+	}
+
+	// Compute-shader fallback for amplification shader
+	{
+		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
+
+		const auto state = Compute::State::MakeUnique();
+		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_AS_LAYOUT]);
+		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_AS));
+		X_RETURN(m_pipelines[MESHLET_CS_FOR_AS], state->GetPipeline(*m_computePipelineCache, L"ComputeShaderMeshletAS"), false);
 	}
 
 	// Compute-shader fallback for mesh shader
@@ -342,9 +375,9 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
 
 		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_CS_LAYOUT]);
+		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT]);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_MS));
-		X_RETURN(m_pipelines[MESHLET_CS], state->GetPipeline(*m_computePipelineCache, L"ComputeShaderMeshlet"), false);
+		X_RETURN(m_pipelines[MESHLET_CS_FOR_MS], state->GetPipeline(*m_computePipelineCache, L"ComputeShaderMeshletMS"), false);
 	}
 
 	// Vertex-shader fallback for mesh shader
@@ -362,6 +395,14 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 	}
 
 	return true;
+}
+
+bool Renderer::createCommandLayout()
+{
+	IndirectArgument arg;
+	arg.Type = IndirectArgumentType::DISPATCH;
+
+	return m_device->CreateCommandLayout(m_commandLayout, sizeof(uint32_t[3]), 1, &arg);
 }
 
 bool Renderer::createDescriptorTables()
@@ -417,11 +458,11 @@ bool Renderer::createDescriptorTables()
 void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex)
 {
 	// Set descriptor tables
-	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[MESHLET_MS_LAYOUT]);
+	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT]);
 	pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 
 	// Set pipeline state
-	pCommandList->SetPipelineState(m_pipelines[MESHLET_MS]);
+	pCommandList->SetPipelineState(m_pipelines[MESHLET_NATIVE]);
 
 	// Record commands.
 	for (auto& obj : m_sceneObjects)
@@ -450,7 +491,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
 
 			// Set descriptor tables
-			pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_LAYOUT]);
+			pCommandList->SetComputePipelineLayout(m_pipelineLayouts[MESHLET_CS_FOR_MS_LAYOUT]);
 			pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 			pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 			pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
@@ -458,7 +499,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
 
 			// Set pipeline state
-			pCommandList->SetPipelineState(m_pipelines[MESHLET_CS]);
+			pCommandList->SetPipelineState(m_pipelines[MESHLET_CS_FOR_MS]);
 
 			// Record commands.
 			pCommandList->Dispatch(mesh.MeshletCount, 1, 1);

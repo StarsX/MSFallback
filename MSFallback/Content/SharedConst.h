@@ -2,6 +2,8 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#pragma once
+
 #define CLEAR_COLOR			0.0f, 0.2f, 0.4f
 //#define CORN_FLOWER_BLUE	0.392156899, 0.584313750, 0.929411829
 
@@ -65,4 +67,12 @@ struct Constants
 	uint        SelectedIndex;
 
 	uint        DrawMeshlets;
+};
+
+struct DispatchArgs
+{
+	uint x;
+	uint y;
+	uint z;
+	uint MeshletIndices[AS_GROUP_SIZE];
 };

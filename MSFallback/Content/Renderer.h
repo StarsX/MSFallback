@@ -37,8 +37,9 @@ public:
 protected:
 	enum PipelineLayoutIndex : uint8_t
 	{
-		MESHLET_MS_LAYOUT,
-		MESHLET_CS_LAYOUT,
+		MESHLET_NATIVE_LAYOUT,
+		MESHLET_CS_FOR_AS_LAYOUT,
+		MESHLET_CS_FOR_MS_LAYOUT,
 		MESHLET_VS_LAYOUT,
 
 		NUM_PIPELINE_LAYOUT
@@ -55,8 +56,9 @@ protected:
 
 	enum PipelineIndex : uint8_t
 	{
-		MESHLET_MS,
-		MESHLET_CS,
+		MESHLET_NATIVE,
+		MESHLET_CS_FOR_AS,
+		MESHLET_CS_FOR_MS,
 		MESHLET_VS,
 
 		NUM_PIPELINE
@@ -113,15 +115,17 @@ protected:
 	bool createPayloadBuffers();
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
+	bool createCommandLayout();
 	bool createDescriptorTables();
 	void renderMS(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
 
-	XUSG::InputLayout			m_inputLayout;
 	XUSG::PipelineLayout		m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
 	XUSG::Pipeline				m_pipelines[NUM_PIPELINE];
+
+	XUSG::CommandLayout			m_commandLayout;
 
 	XUSG::DescriptorTable		m_srvTable;
 	XUSG::DescriptorTable		m_uavTable;
@@ -129,6 +133,7 @@ protected:
 
 	XUSG::IndexBuffer::uptr		m_indexPayloads;
 	XUSG::StructuredBuffer::uptr m_vertPayloads;
+	XUSG::RawBuffer::uptr		m_dispatchPayloads;
 
 	std::vector<SceneObject>	m_sceneObjects;
 

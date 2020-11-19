@@ -8,16 +8,18 @@ struct MeshOutCounts
 	uint PrimCount;
 };
 
-#define main MSMain
+#define SetMeshOutputCounts(vertCount, primCount) \
+{ \
+	moc.VertCount = vertCount; \
+	moc.PrimCount = primCount; \
+}
+
+#define OUT_IDX(i) 0
 #define vertices MeshOutCounts moc, out
 #define indices
-#define SetMeshOutputCounts(vertCount, primCount) { moc.VertCount = vertCount; moc.PrimCount = primCount; }
-#define OUT_IDX(i) 0
+
+#define main MSMain
 #include "MSMeshlet.hlsl"
-#undef OUT_IDX
-#undef SetMeshOutputCounts
-#undef indices
-#undef vertices
 #undef main
 
 RWStructuredBuffer<VertexOut> VertexPayloads;
