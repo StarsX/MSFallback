@@ -150,11 +150,7 @@ void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, const DirectX::X
 void Renderer::Render(Ultimate::CommandList* pCommandList, uint32_t frameIndex,
 	const Descriptor& rtv, bool useMeshShader)
 {
-	const DescriptorPool descriptorPools[] =
-	{
-		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
-		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
-	};
+	const DescriptorPool descriptorPools[] = { m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
 	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 
 	// Clear depth
@@ -294,28 +290,14 @@ bool Renderer::createPayloadBuffers()
 
 bool Renderer::createPipelineLayouts(bool isMSSupported)
 {
-	// Native mesh-shader
-	if (isMSSupported)
+	// Meshlet-culling pipeline layout
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
 		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetShaderStage(SRVS, Shader::MS);
-		pipelineLayout->SetRootSRV(SRV_CULL, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
-		X_RETURN(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT], pipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
-			PipelineLayoutFlag::NONE, L"MSMeshletLayout"), false);
-	}
-
-	// Fallback layer
-	{
-		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRange(SRVS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetShaderStage(SRVS, Shader::MS);
+		pipelineLayout->SetRange(SRV_INPUTS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetShaderStage(SRV_INPUTS, Shader::MS);
 		pipelineLayout->SetRootSRV(SRV_CULL, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
 		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pipelineLayout, *m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, L"MeshletLayout");
@@ -328,30 +310,14 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 
 bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSupported)
 {
-	N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
-
-	// Native mesh-shader
-	if (isMSSupported)
+	// Meshlet-culling pipeline
 	{
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
-
-		const auto state = MeshShader::State::MakeUnique();
-		state->SetPipelineLayout(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT]);
-		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
-		state->SetShader(Shader::Stage::MS, m_shaderPool->GetShader(Shader::Stage::MS, MS_MESHLET));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_MESHLET));
-		state->OMSetNumRenderTargets(1);
-		state->OMSetRTVFormat(0, rtFormat);
-		state->OMSetDSVFormat(dsFormat);
-		X_RETURN(m_pipelines[MESHLET_NATIVE], state->GetPipeline(*m_meshShaderPipelineCache, L"MeshShaderMeshlet"), false);
-	}
-
-	// Fallback layer
-	{
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
 		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
+		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
 
 		const auto state = MeshShader::State::MakeUnique();
 		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
@@ -417,25 +383,17 @@ bool Renderer::createDescriptorTables()
 		X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
-	// Create the sampler table
-	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		const auto sampler = LINEAR_CLAMP;
-		descriptorTable->SetSamplers(0, 1, &sampler, *m_descriptorTableCache);
-		X_RETURN(m_samplerTable, descriptorTable->GetSamplerTable(*m_descriptorTableCache), false);
-	}
-
 	return true;
 }
 
 void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex)
 {
 	// Set descriptor tables
-	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[MESHLET_NATIVE_LAYOUT]);
+	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_native);
 	pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 
 	// Set pipeline state
-	pCommandList->SetPipelineState(m_pipelines[MESHLET_NATIVE]);
+	pCommandList->SetPipelineState(m_pipeline.m_native);
 
 	// Record commands.
 	for (auto& obj : m_sceneObjects)
@@ -445,7 +403,7 @@ void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex
 		for (auto& mesh : obj.Meshes)
 		{
 			pCommandList->SetGraphicsRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
-			pCommandList->SetGraphicsDescriptorTable(SRVS, mesh.SrvTable);
+			pCommandList->SetGraphicsDescriptorTable(SRV_INPUTS, mesh.SrvTable);
 			pCommandList->SetGraphicsRootShaderResourceView(SRV_CULL, mesh.MeshletCullData->GetResource());
 			pCommandList->DispatchMesh(DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE), 1, 1);
 		}
@@ -471,7 +429,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
-				pCommandList->SetComputeRootShaderResourceView(SRVS, mesh.MeshletCullData->GetResource());
+				pCommandList->SetComputeRootShaderResourceView(SRV_INPUTS, mesh.MeshletCullData->GetResource());
 				pCommandList->SetComputeRootUnorderedAccessView(UAVS, m_dispatchPayloads->GetResource());
 
 				// Set pipeline state
@@ -495,7 +453,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
-				pCommandList->SetComputeDescriptorTable(SRVS, mesh.SrvTable);
+				pCommandList->SetComputeDescriptorTable(SRV_INPUTS, mesh.SrvTable);
 				pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
 
 				// Set pipeline state
@@ -517,7 +475,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				// Set descriptor tables
 				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_vs);
 				pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-				pCommandList->SetGraphicsDescriptorTable(SRVS, m_srvTable);
+				pCommandList->SetGraphicsDescriptorTable(SRV_INPUTS, m_srvTable);
 
 				// Set pipeline state
 				pCommandList->SetPipelineState(m_pipeline.m_vs);

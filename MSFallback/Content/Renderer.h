@@ -35,29 +35,15 @@ public:
 	static const uint32_t FrameCount = 3;
 
 protected:
-	enum PipelineLayoutIndex : uint8_t
-	{
-		MESHLET_NATIVE_LAYOUT,
-
-		NUM_PIPELINE_LAYOUT
-	};
-
 	enum PipelineLayoutSlot : uint8_t
 	{
 		CBV_GLOBALS,
 		CBV_MESHINFO,
 		CBV_INSTANCE,
-		SRVS,
+		SRV_INPUTS,
 		SRV_CULL,
 		UAVS = SRV_CULL,
 		SRV_AS_PAYLOADS
-	};
-
-	enum PipelineIndex : uint8_t
-	{
-		MESHLET_NATIVE,
-
-		NUM_PIPELINE
 	};
 
 	enum ComputeShaderID : uint8_t
@@ -117,19 +103,10 @@ protected:
 	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
-
-	std::unique_ptr<MeshShaderFallbackLayer> m_meshShaderFallbackLayer;
-	MeshShaderFallbackLayer::PipelineLayout m_pipelineLayout;
-	MeshShaderFallbackLayer::Pipeline m_pipeline;
-
-	XUSG::PipelineLayout		m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
-	XUSG::Pipeline				m_pipelines[NUM_PIPELINE];
-
 	XUSG::CommandLayout			m_commandLayout;
 
 	XUSG::DescriptorTable		m_srvTable;
 	XUSG::DescriptorTable		m_uavTable;
-	XUSG::DescriptorTable		m_samplerTable;
 
 	XUSG::IndexBuffer::uptr		m_indexPayloads;
 	XUSG::StructuredBuffer::uptr m_vertPayloads;
@@ -148,6 +125,10 @@ protected:
 	XUSG::MeshShader::PipelineCache::uptr	m_meshShaderPipelineCache;
 	XUSG::PipelineLayoutCache::uptr			m_pipelineLayoutCache;
 	XUSG::DescriptorTableCache::uptr		m_descriptorTableCache;
+
+	std::unique_ptr<MeshShaderFallbackLayer> m_meshShaderFallbackLayer;
+	MeshShaderFallbackLayer::PipelineLayout m_pipelineLayout;
+	MeshShaderFallbackLayer::Pipeline m_pipeline;
 
 	DirectX::XMFLOAT2			m_viewport;
 };
