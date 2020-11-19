@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "Ultimate/XUSGUltimate.h"
+#include "MeshShaderFallbackLayer.h"
 #include "Model.h"
 
 class Renderer
@@ -38,9 +38,6 @@ protected:
 	enum PipelineLayoutIndex : uint8_t
 	{
 		MESHLET_NATIVE_LAYOUT,
-		MESHLET_CS_FOR_AS_LAYOUT,
-		MESHLET_CS_FOR_MS_LAYOUT,
-		MESHLET_VS_LAYOUT,
 
 		NUM_PIPELINE_LAYOUT
 	};
@@ -51,16 +48,14 @@ protected:
 		CBV_MESHINFO,
 		CBV_INSTANCE,
 		SRVS,
-		UAVS,
+		SRV_CULL,
+		UAVS = SRV_CULL,
 		SRV_AS_PAYLOADS
 	};
 
 	enum PipelineIndex : uint8_t
 	{
 		MESHLET_NATIVE,
-		MESHLET_CS_FOR_AS,
-		MESHLET_CS_FOR_MS,
-		MESHLET_VS,
 
 		NUM_PIPELINE
 	};
@@ -122,6 +117,10 @@ protected:
 	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
+
+	std::unique_ptr<MeshShaderFallbackLayer> m_meshShaderFallbackLayer;
+	MeshShaderFallbackLayer::PipelineLayout m_pipelineLayout;
+	MeshShaderFallbackLayer::Pipeline m_pipeline;
 
 	XUSG::PipelineLayout		m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
 	XUSG::Pipeline				m_pipelines[NUM_PIPELINE];
