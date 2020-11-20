@@ -99,6 +99,7 @@ protected:
 	bool createDescriptorTables();
 	void renderMS(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
+	void renderFallbackLayer(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
 	XUSG::CommandLayout			m_commandLayout;

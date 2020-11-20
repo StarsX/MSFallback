@@ -107,6 +107,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 
 					++index;
 				}
+				else indexMaps[n] = { 0xffffffff };
 			}
 		}
 
@@ -269,12 +270,15 @@ void MeshShaderFallbackLayer::SetDescriptorTable(CommandList* pCommandList, uint
 	else for(auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetDescriptorTables;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetDescriptorTables;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		command.pDescriptorTable = &descriptorTable;
+			command.Index = indexPair.Prm;
+			command.pDescriptorTable = &descriptorTable;
+		}
 	}
 }
 
@@ -284,13 +288,16 @@ void MeshShaderFallbackLayer::Set32BitConstant(CommandList* pCommandList, uint32
 	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetConstants;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetConstants;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		if (command.Constants.size() <= destOffsetIn32BitValues) commands.resize(destOffsetIn32BitValues + 1);
-		command.Constants[destOffsetIn32BitValues] = srcData;
+			command.Index = indexPair.Prm;
+			if (command.Constants.size() <= destOffsetIn32BitValues) commands.resize(destOffsetIn32BitValues + 1);
+			command.Constants[destOffsetIn32BitValues] = srcData;
+		}
 	}
 }
 
@@ -301,13 +308,16 @@ void MeshShaderFallbackLayer::Set32BitConstants(CommandList* pCommandList, uint3
 	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetConstants;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetConstants;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		if (command.Constants.size() < num32BitValuesToSet) commands.resize(num32BitValuesToSet);
-		memcpy(command.Constants.data(), &reinterpret_cast<const uint32_t*>(pSrcData)[destOffsetIn32BitValues], sizeof(uint32_t) * num32BitValuesToSet);
+			command.Index = indexPair.Prm;
+			if (command.Constants.size() < num32BitValuesToSet) commands.resize(num32BitValuesToSet);
+			memcpy(command.Constants.data(), &reinterpret_cast<const uint32_t*>(pSrcData)[destOffsetIn32BitValues], sizeof(uint32_t) * num32BitValuesToSet);
+		}
 	}
 }
 
@@ -317,13 +327,16 @@ void MeshShaderFallbackLayer::SetRootConstantBufferView(CommandList* pCommandLis
 	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetRootCBVs;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetRootCBVs;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		command.pResource = addressof(resource);
-		command.Offset = offset;
+			command.Index = indexPair.Prm;
+			command.pResource = addressof(resource);
+			command.Offset = offset;
+		}
 	}
 }
 
@@ -333,13 +346,16 @@ void MeshShaderFallbackLayer::SetRootShaderResourceView(CommandList* pCommandLis
 	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetRootSRVs;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetRootSRVs;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		command.pResource = addressof(resource);
-		command.Offset = offset;
+			command.Index = indexPair.Prm;
+			command.pResource = addressof(resource);
+			command.Offset = offset;
+		}
 	}
 }
 
@@ -349,13 +365,16 @@ void MeshShaderFallbackLayer::SetRootUnorderedAccessView(CommandList* pCommandLi
 	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
 	{
 		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
-		auto& commands = m_pipelineSetCommands[i].SetRootUAVs;
-		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
-		auto& command = commands[indexPair.Cmd];
+		if (indexPair.Cmd < 0xffffffff)
+		{
+			auto& commands = m_pipelineSetCommands[i].SetRootUAVs;
+			if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+			auto& command = commands[indexPair.Cmd];
 
-		command.Index = indexPair.Prm;
-		command.pResource = addressof(resource);
-		command.Offset = offset;
+			command.Index = indexPair.Prm;
+			command.pResource = addressof(resource);
+			command.Offset = offset;
+		}
 	}
 }
 
@@ -424,7 +443,7 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 			{
 				const int baseOffset = sizeof(DispatchArgs) * i;
 				pCommandList->SetComputeRootShaderResourceView(m_pCurrentPipelineLayout->m_payloadSrvIndexMS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
-				pCommandList->SetCompute32BitConstant(m_pCurrentPipelineLayout->m_batchIndexMS + 1, i);
+				pCommandList->SetCompute32BitConstant(m_pCurrentPipelineLayout->m_batchIndexMS, i);
 				pCommandList->ExecuteIndirect(m_commandLayouts[DISPATCH], 1, m_dispatchPayloads->GetResource(), baseOffset);
 			}
 
@@ -465,6 +484,8 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uint32_t groupVertCount,
 	uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize)
 {
+	const auto batchCount = DIV_UP(maxMeshletCount, batchSize);
+
 	{
 		m_vertPayloads = StructuredBuffer::MakeUnique();
 		N_RETURN(m_vertPayloads->Create(m_device, groupVertCount * maxMeshletCount, vertexStride,
@@ -474,14 +495,12 @@ bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uin
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * groupPrimCount * maxMeshletCount,
+		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * groupPrimCount * batchSize * batchCount,//maxMeshletCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
 
 	{
-		const auto batchCount = DIV_UP(maxMeshletCount, batchSize);
-
 		m_dispatchPayloads = StructuredBuffer::MakeUnique();
 		const uint32_t stride = sizeof(uint32_t);
 		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;

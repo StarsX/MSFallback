@@ -165,7 +165,7 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint32_t frameIndex,
 	pCommandList->OMSetRenderTargets(1, &rtv, &m_depth->GetDSV());
 
 	if (useMeshShader) renderMS(pCommandList, frameIndex);
-	else renderFallback(pCommandList, frameIndex);
+	else renderFallbackLayer(pCommandList, frameIndex);
 }
 
 bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<Resource>& uploaders)
@@ -254,17 +254,20 @@ bool Renderer::createPayloadBuffers()
 		for (auto& mesh : obj.Meshes)
 			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
 
+	struct VertexOut
+	{
+		float PositionHS[4];
+		float PositionVS[3];
+		float Normal[3];
+		uint32_t MeshletIndex;
+	};
+
+	N_RETURN(m_meshShaderFallbackLayer->Init(*m_descriptorTableCache, maxMeshletCount, MAX_VERT_COUNT,
+		MAX_PRIM_COUNT, sizeof(VertexOut), AS_GROUP_SIZE), false);
+
 	const auto batchCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
 
 	{
-		struct VertexOut
-		{
-			float PositionHS[4];
-			float PositionVS[3];
-			float Normal[3];
-			uint32_t MeshletIndex;
-		};
-
 		m_vertPayloads = StructuredBuffer::MakeUnique();
 		N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
@@ -492,6 +495,32 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 					pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * AS_GROUP_SIZE, 1, 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i, 0, 0);
 				}
 			}
+		}
+	}
+}
+
+void Renderer::renderFallbackLayer(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex)
+{
+	m_meshShaderFallbackLayer->EnableNativeMeshShader(false);
+
+	// Set descriptor tables
+	m_meshShaderFallbackLayer->SetPipelineLayout(pCommandList, m_pipelineLayout);
+	m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
+
+	// Set pipeline state
+	m_meshShaderFallbackLayer->SetPipelineState(pCommandList, m_pipeline);
+
+	// Record commands.
+	for (auto& obj : m_sceneObjects)
+	{
+		m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
+
+		for (auto& mesh : obj.Meshes)
+		{
+			m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_MESHINFO, mesh.MeshInfo->GetResource());
+			m_meshShaderFallbackLayer->SetDescriptorTable(pCommandList, SRV_INPUTS, mesh.SrvTable);
+			m_meshShaderFallbackLayer->SetRootShaderResourceView(pCommandList, SRV_CULL, mesh.MeshletCullData->GetResource());
+			m_meshShaderFallbackLayer->DispatchMesh(pCommandList, DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE), 1, 1);
 		}
 	}
 }
