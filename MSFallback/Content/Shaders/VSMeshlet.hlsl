@@ -17,7 +17,7 @@ cbuffer PerDispatch : FALLBACK_LAYER_PAYLOAD_REG(b0)
 	uint BatchIdx;
 }
 
-StructuredBuffer<VertexOut> VertexPayloads;
+StructuredBuffer<VertexOut> VertexPayloads : FALLBACK_LAYER_PAYLOAD_REG(t0);
 
 VertexOut main(uint vid : SV_VertexID)
 {

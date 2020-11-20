@@ -271,7 +271,7 @@ bool Renderer::createPayloadBuffers()
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
+		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
