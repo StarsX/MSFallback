@@ -272,14 +272,16 @@ bool Renderer::createPayloadBuffers()
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
 		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint32_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
-			Format::R32_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
+			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
 
 	{
+		const auto batchCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
+
 		m_dispatchPayloads = StructuredBuffer::MakeUnique();
 		const uint32_t stride = sizeof(uint32_t);
-		const uint32_t numElements = sizeof(DispatchArgs) / stride * DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
+		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
 		N_RETURN(m_dispatchPayloads->Create(m_device, numElements, stride,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
@@ -420,7 +422,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			ResourceBarrier barriers[3];
 			auto numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 
-			const auto dispatchCount = DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE);
+			const auto batchCount = DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE);
 
 			// Amplification fallback
 			{
@@ -436,7 +438,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetPipelineState(m_pipeline.m_as);
 
 				// Record commands.
-				pCommandList->Dispatch(dispatchCount, 1, 1);
+				pCommandList->Dispatch(batchCount, 1, 1);
 			}
 
 			// Set barriers
@@ -460,10 +462,11 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetPipelineState(m_pipeline.m_ms);
 
 				// Record commands.
-				for (auto i = 0u; i < dispatchCount; ++i)
+				for (auto i = 0u; i < batchCount; ++i)
 				{
 					const int baseOffset = sizeof(DispatchArgs) * i;
 					pCommandList->SetComputeRootShaderResourceView(SRV_AS_PAYLOADS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
+					pCommandList->SetCompute32BitConstant(SRV_AS_PAYLOADS + 1, i);
 					pCommandList->ExecuteIndirect(m_commandLayout, 1, m_dispatchPayloads->GetResource(), baseOffset);
 				}
 
@@ -483,7 +486,11 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				// Record commands.
 				pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
 				pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
-				pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * mesh.MeshletCount, 1, 0, 0, 0);
+				for (auto i = 0u; i < batchCount; ++i)
+				{
+					pCommandList->SetGraphics32BitConstant(SRV_INPUTS + 1, i);
+					pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * AS_GROUP_SIZE, 1, 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i, 0, 0);
+				}
 			}
 		}
 	}

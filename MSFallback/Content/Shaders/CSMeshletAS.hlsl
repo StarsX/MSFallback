@@ -4,7 +4,7 @@
 
 #include "SharedConst.h"
 
-RWStructuredBuffer<uint> DispatchMeshArgs;
+RWStructuredBuffer<uint> DispatchMeshArgs : FALLBACK_LAYER_PAYLOAD_REG(u0);
 
 #define DispatchMesh(x, y, z, payload) \
 { \

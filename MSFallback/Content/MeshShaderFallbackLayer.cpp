@@ -1,4 +1,8 @@
-#include "stdafx.h"
+//--------------------------------------------------------------------------------------
+// Copyright (c) XU, Tianchen. All rights reserved.
+//--------------------------------------------------------------------------------------
+
+#include "SharedConst.h"
 #include "MeshShaderFallbackLayer.h"
 
 using namespace std;
@@ -89,7 +93,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		// Convert the descriptor table layouts of AS to CS
 		const auto pipelineLayoutAS = convertDescriptorTableLayouts(Shader::Stage::AS, Shader::Stage::CS);
 		const auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutAS->GetDescriptorTableLayoutKeys().size());
-		pipelineLayoutAS->SetRootUAV(descriptorTableCount, 0); // AS payload buffer
+		pipelineLayoutAS->SetRootUAV(descriptorTableCount, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // AS payload buffer
 		pipelineLayout.m_as = pipelineLayoutAS->GetPipelineLayout(pipelineLayoutCache,
 			flags, (wstring(name) + L"_CSforASLayout").c_str());
 	}
@@ -99,18 +103,20 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		// Convert the descriptor table layouts of AS to CS
 		const auto pipelineLayoutMS = convertDescriptorTableLayouts(Shader::Stage::MS, Shader::Stage::CS);
 		auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutMS->GetDescriptorTableLayoutKeys().size());
-		pipelineLayoutMS->SetRange(descriptorTableCount++, DescriptorType::UAV, 2, 0); // VB and IB payloads
-		pipelineLayoutMS->SetRootSRV(descriptorTableCount, 5, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE); // AS payload buffer
+		pipelineLayoutMS->SetRange(descriptorTableCount++, DescriptorType::UAV, 2, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // VB and IB payloads
+		pipelineLayoutMS->SetRootSRV(descriptorTableCount++, 0, FALLBACK_LAYER_PAYLOAD_SPACE, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE); // AS payload buffer
+		pipelineLayoutMS->SetConstants(descriptorTableCount, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // Batch index
 		pipelineLayout.m_ms = pipelineLayoutMS->GetPipelineLayout(pipelineLayoutCache,
 			flags, (wstring(name) + L"_CSforMSLayout").c_str());
 	}
 
 	// Vertex-shader fallback for mesh shader
 	{
-		const auto pipelineLayoutVS = convertDescriptorTableLayouts(Shader::Stage::ALL, Shader::Stage::VS);
+		auto pipelineLayoutVS = convertDescriptorTableLayouts(Shader::Stage::ALL, Shader::Stage::VS);
 		auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutVS->GetDescriptorTableLayoutKeys().size());
 		pipelineLayoutVS->SetRange(descriptorTableCount, DescriptorType::SRV, 1, 0);
-		pipelineLayoutVS->SetShaderStage(descriptorTableCount, Shader::VS);
+		pipelineLayoutVS->SetShaderStage(descriptorTableCount++, Shader::Stage::VS);
+		pipelineLayoutVS->SetConstants(descriptorTableCount, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE, Shader::Stage::VS); // Batch index
 		pipelineLayout.m_vs = pipelineLayoutVS->GetPipelineLayout(pipelineLayoutCache,
 			flags, (wstring(name) + L"_VSforMSLayout").c_str());
 	}
