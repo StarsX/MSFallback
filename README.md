@@ -1,5 +1,5 @@
 # MSFallback
-Meshlet culling by amplification-shader and mesh-shader fallback implementations using compute and vertex shaders. [TODO] Make a fallback layer interface.
+Meshlet culling by a layer of interface with amplification-shader and mesh-shader fallback implementations using compute and vertex shaders. [TODO] Unify the native and fallback calls using the fallback layer.
 
 Hot keys:
 
