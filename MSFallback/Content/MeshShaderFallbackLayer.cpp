@@ -10,8 +10,20 @@ using namespace XUSG;
 
 MeshShaderFallbackLayer::MeshShaderFallbackLayer(const Device& device, bool isMSSupported) :
 	m_device(device),
-	m_isMSSupported(isMSSupported)
+	m_isMSSupported(isMSSupported),
+	m_useNative(isMSSupported)
 {
+	IndirectArgument arg;
+	{
+		
+		arg.Type = IndirectArgumentType::DISPATCH;
+		device->CreateCommandLayout(m_commandLayouts[DISPATCH], sizeof(uint32_t[3]), 1, &arg);
+	}
+
+	{
+		arg.Type = IndirectArgumentType::DRAW_INDEXED;
+		device->CreateCommandLayout(m_commandLayouts[DRAW_INDEXED], sizeof(uint32_t[5]), 1, &arg);
+	}
 }
 
 MeshShaderFallbackLayer::~MeshShaderFallbackLayer()
@@ -29,7 +41,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 			flags, (wstring(name) + L"_NativeLayout").c_str());
 
 	const auto& descriptorTableLayoutKeys = utilPipelineLayout->GetDescriptorTableLayoutKeys();
-	const auto convertDescriptorTableLayouts = [&descriptorTableLayoutKeys](Shader::Stage srcStage, Shader::Stage dstStage)
+	const auto convertDescriptorTableLayouts = [&descriptorTableLayoutKeys](Shader::Stage srcStage, Shader::Stage dstStage, vector<PipelineLayout::IndexPair>& indexMaps)
 	{
 		struct DescriptorRange
 		{
@@ -43,9 +55,12 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		const auto pipelineLayout = Util::PipelineLayout::MakeShared();
 		const auto descriptorTableCount = static_cast<uint32_t>(descriptorTableLayoutKeys.size());
 
-		auto index = 0u;
-		for (const auto& key : descriptorTableLayoutKeys)
+		auto index = 0u, constIndex = 0u, srvIndex = 0u, uavIndex = 0u, cbvIndex = 0u, descTableIndex = 0u;
+		indexMaps.resize(descriptorTableCount);
+
+		for (auto n = 0u; n < descriptorTableCount; ++n)
 		{
+			const auto& key = descriptorTableLayoutKeys[n];
 			const auto numRanges = key.size() > 0 ? static_cast<uint32_t>((key.size() - 1) / sizeof(DescriptorRange)) : 0;
 
 			if (numRanges > 0)
@@ -60,15 +75,19 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 					{
 					case DescriptorType::CONSTANT:
 						pipelineLayout->SetConstants(index, pRanges->NumDescriptors, pRanges->BaseBinding, pRanges->Space, stage);
+						indexMaps[n] = { constIndex++, index };
 						break;
 					case DescriptorType::ROOT_SRV:
 						pipelineLayout->SetRootSRV(index, pRanges->BaseBinding, pRanges->Space, pRanges->Flags, stage);
+						indexMaps[n] = { srvIndex++, index };
 						break;
 					case DescriptorType::ROOT_UAV:
 						pipelineLayout->SetRootUAV(index, pRanges->BaseBinding, pRanges->Space, pRanges->Flags, stage);
+						indexMaps[n] = { uavIndex++, index };
 						break;
 					case DescriptorType::ROOT_CBV:
 						pipelineLayout->SetRootCBV(index, pRanges->BaseBinding, pRanges->Space, pRanges->Flags, stage);
+						indexMaps[n] = { cbvIndex++, index };
 						break;
 					default:
 						//layout->ranges = DescriptorRangeList(numRanges);
@@ -78,6 +97,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 							pipelineLayout->SetRange(index, range.ViewType, range.NumDescriptors, range.BaseBinding, range.Space, range.Flags);
 						}
 						pipelineLayout->SetShaderStage(index, stage);
+						indexMaps[n] = { descTableIndex++, index };
 					}
 
 					++index;
@@ -91,34 +111,34 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 	// Compute-shader fallback for amplification shader
 	{
 		// Convert the descriptor table layouts of AS to CS
-		const auto pipelineLayoutAS = convertDescriptorTableLayouts(Shader::Stage::AS, Shader::Stage::CS);
+		const auto pipelineLayoutAS = convertDescriptorTableLayouts(Shader::Stage::AS, Shader::Stage::CS, pipelineLayout.m_indexMaps[FALLBACK_AS]);
 		const auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutAS->GetDescriptorTableLayoutKeys().size());
 		pipelineLayoutAS->SetRootUAV(descriptorTableCount, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // AS payload buffer
-		pipelineLayout.m_as = pipelineLayoutAS->GetPipelineLayout(pipelineLayoutCache,
-			flags, (wstring(name) + L"_CSforASLayout").c_str());
+		pipelineLayout.m_fallbacks[FALLBACK_AS] = pipelineLayoutAS->GetPipelineLayout(pipelineLayoutCache,
+			flags, (wstring(name) + L"_FallbackASLayout").c_str());
 	}
 
 	// Compute-shader fallback for mesh shader
 	{
 		// Convert the descriptor table layouts of AS to CS
-		const auto pipelineLayoutMS = convertDescriptorTableLayouts(Shader::Stage::MS, Shader::Stage::CS);
+		const auto pipelineLayoutMS = convertDescriptorTableLayouts(Shader::Stage::MS, Shader::Stage::CS, pipelineLayout.m_indexMaps[FALLBACK_MS]);
 		auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutMS->GetDescriptorTableLayoutKeys().size());
 		pipelineLayoutMS->SetRange(descriptorTableCount++, DescriptorType::UAV, 2, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // VB and IB payloads
 		pipelineLayoutMS->SetRootSRV(descriptorTableCount++, 0, FALLBACK_LAYER_PAYLOAD_SPACE, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE); // AS payload buffer
 		pipelineLayoutMS->SetConstants(descriptorTableCount, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // Batch index
-		pipelineLayout.m_ms = pipelineLayoutMS->GetPipelineLayout(pipelineLayoutCache,
-			flags, (wstring(name) + L"_CSforMSLayout").c_str());
+		pipelineLayout.m_fallbacks[FALLBACK_MS] = pipelineLayoutMS->GetPipelineLayout(pipelineLayoutCache,
+			flags, (wstring(name) + L"_FallbackMSLayout").c_str());
 	}
 
 	// Vertex-shader fallback for mesh shader
 	{
-		auto pipelineLayoutVS = convertDescriptorTableLayouts(Shader::Stage::ALL, Shader::Stage::VS);
+		auto pipelineLayoutVS = convertDescriptorTableLayouts(Shader::Stage::PS, Shader::Stage::PS, pipelineLayout.m_indexMaps[FALLBACK_PS]);
 		auto descriptorTableCount = static_cast<uint32_t>(pipelineLayoutVS->GetDescriptorTableLayoutKeys().size());
 		pipelineLayoutVS->SetRange(descriptorTableCount, DescriptorType::SRV, 1, 0);
 		pipelineLayoutVS->SetShaderStage(descriptorTableCount++, Shader::Stage::VS);
 		pipelineLayoutVS->SetConstants(descriptorTableCount, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE, Shader::Stage::VS); // Batch index
-		pipelineLayout.m_vs = pipelineLayoutVS->GetPipelineLayout(pipelineLayoutCache,
-			flags, (wstring(name) + L"_VSforMSLayout").c_str());
+		pipelineLayout.m_fallbacks[FALLBACK_PS] = pipelineLayoutVS->GetPipelineLayout(pipelineLayoutCache,
+			flags, (wstring(name) + L"_FallbackPSLayout").c_str());
 	}
 
 	return pipelineLayout;
@@ -141,18 +161,18 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 	if (csAS)
 	{
 		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(pipelineLayout.m_as);
+		state->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_AS]);
 		state->SetShader(csAS);
-		pipeline.m_as = state->GetPipeline(computePipelineCache, (wstring(name) + L"_CSforAS").c_str());
+		pipeline.m_fallbacks[FALLBACK_AS] = state->GetPipeline(computePipelineCache, (wstring(name) + L"_FallbackAS").c_str());
 	}
 
 	// Compute-shader fallback for mesh shader
 	assert(csMS);
 	{
 		const auto state = Compute::State::MakeUnique();
-		state->SetPipelineLayout(pipelineLayout.m_ms);
+		state->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_MS]);
 		state->SetShader(csMS);
-		pipeline.m_ms = state->GetPipeline(computePipelineCache, (wstring(name) + L"_CSforMS").c_str());
+		pipeline.m_fallbacks[FALLBACK_MS] = state->GetPipeline(computePipelineCache, (wstring(name) + L"_FallbackMS").c_str());
 	}
 
 	// Vertex-shader fallback for mesh shader
@@ -184,7 +204,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		const auto& pKey = reinterpret_cast<const Key*>(state->GetKey().c_str());
 		const auto gState = Graphics::State::MakeUnique();
 
-		gState->SetPipelineLayout(pipelineLayout.m_vs);
+		gState->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_PS]);
 		gState->SetShader(Shader::Stage::VS, vsMS);
 		if (pKey->Shaders[PS]) gState->SetShader(Shader::Stage::PS, reinterpret_cast<Blob::element_type*>(pKey->Shaders[PS]));
 
@@ -197,19 +217,180 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		for (auto i = 0; i < 8; ++i) gState->OMSetRTVFormat(i, pKey->RTVFormats[i]);
 		gState->OMSetDSVFormat(pKey->DSVFormat);
 
-		pipeline.m_vs = gState->GetPipeline(graphicsPipelineCache, (wstring(name) + L"_VSforMS").c_str());
+		pipeline.m_fallbacks[FALLBACK_PS] = gState->GetPipeline(graphicsPipelineCache, (wstring(name) + L"_FallbackPS").c_str());
 	}
 
 	return pipeline;
 }
 
+void MeshShaderFallbackLayer::EnableNativeMeshShader(bool enable)
+{
+	m_useNative = enable && m_isMSSupported;
+}
+
+void MeshShaderFallbackLayer::SetPipelineLayout(CommandList* pCommandList, const PipelineLayout& pipelineLayout)
+{
+	if (m_useNative) pCommandList->SetGraphicsPipelineLayout(pipelineLayout.m_native);
+	else
+	{
+		for (auto& commands : m_PipelineSetCommands)
+		{
+			commands.SetDescriptorTables.clear();
+			commands.SetConstants.clear();
+			commands.SetRootCBVs.clear();
+			commands.SetRootSRVs.clear();
+			commands.SetRootUAVs.clear();
+		}
+
+		m_pCurrentPipelineLayout = &pipelineLayout;
+	}
+}
+
+void MeshShaderFallbackLayer::SetPipelineState(CommandList* pCommandList, const Pipeline& pipeline)
+{
+	if (m_useNative) pCommandList->SetPipelineState(pipeline.m_native);
+	else m_pCurrentPipeline = &pipeline;
+}
+
+void MeshShaderFallbackLayer::SetDescriptorTable(CommandList* pCommandList, uint32_t index, const DescriptorTable& descriptorTable)
+{
+	if (m_useNative) pCommandList->SetGraphicsDescriptorTable(index, descriptorTable);
+	else for(auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetDescriptorTables;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		command.pDescriptorTable = &descriptorTable;
+	}
+}
+
+void MeshShaderFallbackLayer::Set32BitConstant(CommandList* pCommandList, uint32_t index, uint32_t srcData, uint32_t destOffsetIn32BitValues)
+{
+	if (m_useNative) pCommandList->SetGraphics32BitConstant(index, srcData, destOffsetIn32BitValues);
+	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetConstants;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		if (command.Constants.size() <= destOffsetIn32BitValues) commands.resize(destOffsetIn32BitValues + 1);
+		command.Constants[destOffsetIn32BitValues] = srcData;
+	}
+}
+
+void MeshShaderFallbackLayer::Set32BitConstants(CommandList* pCommandList, uint32_t index,
+	uint32_t num32BitValuesToSet, const void* pSrcData, uint32_t destOffsetIn32BitValues)
+{
+	if (m_useNative) pCommandList->SetGraphics32BitConstants(index, num32BitValuesToSet, pSrcData, destOffsetIn32BitValues);
+	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetConstants;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		if (command.Constants.size() < num32BitValuesToSet) commands.resize(num32BitValuesToSet);
+		memcpy(command.Constants.data(), &reinterpret_cast<const uint32_t*>(pSrcData)[destOffsetIn32BitValues], sizeof(uint32_t) * num32BitValuesToSet);
+	}
+}
+
+void MeshShaderFallbackLayer::SetRootConstantBufferView(CommandList* pCommandList, uint32_t index, const Resource& resource, int offset)
+{
+	if (m_useNative) pCommandList->SetGraphicsRootConstantBufferView(index, resource, offset);
+	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetRootCBVs;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		command.pResource = addressof(resource);
+		command.Offset = offset;
+	}
+}
+
+void MeshShaderFallbackLayer::SetRootShaderResourceView(CommandList* pCommandList, uint32_t index, const Resource& resource, int offset)
+{
+	if (m_useNative) pCommandList->SetGraphicsRootShaderResourceView(index, resource, offset);
+	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetRootSRVs;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		command.pResource = addressof(resource);
+		command.Offset = offset;
+	}
+}
+
+void MeshShaderFallbackLayer::SetRootUnorderedAccessView(CommandList* pCommandList, uint32_t index, const Resource& resource, int offset)
+{
+	if (m_useNative) pCommandList->SetGraphicsRootUnorderedAccessView(index, resource, offset);
+	else for (auto i = 0u; i < FALLBACK_PIPE_COUNT; ++i)
+	{
+		const auto& indexPair = m_pCurrentPipelineLayout->m_indexMaps[i][index];
+		auto& commands = m_PipelineSetCommands[i].SetRootUAVs;
+		if (commands.size() <= indexPair.Cmd) commands.resize(indexPair.Cmd + 1);
+		auto& command = commands[indexPair.Cmd];
+
+		command.Index = indexPair.Prm;
+		command.pResource = addressof(resource);
+		command.Offset = offset;
+	}
+}
+
+void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ)
+{
+	if (m_useNative) pCommandList->DispatchMesh(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+	{
+		// Set barrier
+		ResourceBarrier barriers[3];
+		//auto numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
+
+		const auto batchCount = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
+
+		// Amplification fallback
+		if (m_pCurrentPipeline->m_fallbacks[FALLBACK_AS])
+		{
+			// Set descriptor tables
+			pCommandList->SetComputePipelineLayout(m_pCurrentPipelineLayout->m_fallbacks[FALLBACK_AS]);
+			for (const auto& command : m_PipelineSetCommands[FALLBACK_AS].SetDescriptorTables)
+				pCommandList->SetComputeDescriptorTable(command.Index, *command.pDescriptorTable);
+			for (const auto& command : m_PipelineSetCommands[FALLBACK_AS].SetConstants)
+				pCommandList->SetCompute32BitConstants(command.Index, static_cast<uint32_t>(command.Constants.size()), command.Constants.data());
+			for (const auto& command : m_PipelineSetCommands[FALLBACK_AS].SetRootCBVs)
+				pCommandList->SetComputeRootConstantBufferView(command.Index, *command.pResource, command.Offset);
+			for (const auto& command : m_PipelineSetCommands[FALLBACK_AS].SetRootSRVs)
+				pCommandList->SetComputeRootShaderResourceView(command.Index, *command.pResource, command.Offset);
+			for (const auto& command : m_PipelineSetCommands[FALLBACK_AS].SetRootUAVs)
+				pCommandList->SetComputeRootUnorderedAccessView(command.Index, *command.pResource, command.Offset);
+			//pCommandList->SetComputeRootUnorderedAccessView(UAVS, m_dispatchPayloads->GetResource());
+
+			// Set pipeline state
+			pCommandList->SetPipelineState(m_pCurrentPipeline->m_fallbacks[FALLBACK_AS]);
+
+			// Record commands.
+			pCommandList->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+		}
+	}
+}
+
 bool MeshShaderFallbackLayer::PipelineLayout::IsValid(bool isMSSupported) const
 {
 	return (m_native != nullptr) == isMSSupported &&
-		m_as && m_ms && m_vs;
+		m_fallbacks[FALLBACK_AS] && m_fallbacks[FALLBACK_MS] && m_fallbacks[FALLBACK_PS];
 }
 
 bool MeshShaderFallbackLayer::Pipeline::IsValid(bool isMSSupported) const
 {
-	return (m_native != nullptr) == isMSSupported && m_ms && m_vs;
+	return (m_native != nullptr) == isMSSupported && m_fallbacks[FALLBACK_MS] && m_fallbacks[FALLBACK_PS];
 }

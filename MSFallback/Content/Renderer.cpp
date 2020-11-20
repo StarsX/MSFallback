@@ -427,7 +427,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			// Amplification fallback
 			{
 				// Set descriptor tables
-				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_as);
+				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_AS]);
 				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
@@ -435,7 +435,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootUnorderedAccessView(UAVS, m_dispatchPayloads->GetResource());
 
 				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_as);
+				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_AS]);
 
 				// Record commands.
 				pCommandList->Dispatch(batchCount, 1, 1);
@@ -451,7 +451,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 			// Mesh-shader fallback
 			{
 				// Set descriptor tables
-				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_ms);
+				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_MS]);
 				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
@@ -459,7 +459,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
 
 				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_ms);
+				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_MS]);
 
 				// Record commands.
 				for (auto i = 0u; i < batchCount; ++i)
@@ -476,12 +476,12 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->Barrier(numBarriers, barriers);
 
 				// Set descriptor tables
-				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_vs);
+				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
 				pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
 				pCommandList->SetGraphicsDescriptorTable(SRV_INPUTS, m_srvTable);
 
 				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_vs);
+				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
 
 				// Record commands.
 				pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);

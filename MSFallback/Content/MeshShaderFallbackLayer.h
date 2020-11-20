@@ -9,6 +9,15 @@
 class MeshShaderFallbackLayer
 {
 public:
+	enum PipelineType
+	{
+		FALLBACK_AS,
+		FALLBACK_MS,
+		FALLBACK_PS,
+
+		FALLBACK_PIPE_COUNT
+	};
+
 	class PipelineLayout
 	{
 	public:
@@ -16,9 +25,15 @@ public:
 	//private:
 		friend MeshShaderFallbackLayer;
 		XUSG::PipelineLayout m_native;
-		XUSG::PipelineLayout m_as;
-		XUSG::PipelineLayout m_ms;
-		XUSG::PipelineLayout m_vs;
+		XUSG::PipelineLayout m_fallbacks[FALLBACK_PIPE_COUNT];
+	private:
+		struct IndexPair
+		{
+			uint32_t Cmd;
+			uint32_t Prm;
+		};
+
+		std::vector<IndexPair> m_indexMaps[FALLBACK_PIPE_COUNT];
 	};
 
 	class Pipeline
@@ -28,9 +43,7 @@ public:
 	//private:
 		friend MeshShaderFallbackLayer;
 		XUSG::Pipeline m_native;
-		XUSG::Pipeline m_as;
-		XUSG::Pipeline m_ms;
-		XUSG::Pipeline m_vs;
+		XUSG::Pipeline m_fallbacks[FALLBACK_PIPE_COUNT];
 	};
 
 	MeshShaderFallbackLayer(const XUSG::Device& device, bool isMSSupported);
@@ -48,7 +61,61 @@ public:
 		XUSG::Graphics::PipelineCache& graphicsPipelineCache,
 		const wchar_t* name = nullptr);
 
+	void EnableNativeMeshShader(bool enable);
+	void SetPipelineLayout(XUSG::CommandList* pCommandList, const PipelineLayout& pipelineLayout);
+	void SetPipelineState(XUSG::CommandList* pCommandList, const Pipeline& pipeline);
+	void SetDescriptorTable(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::DescriptorTable& descriptorTable);
+	void Set32BitConstant(XUSG::CommandList* pCommandList, uint32_t index, uint32_t srcData, uint32_t destOffsetIn32BitValues = 0);
+	void Set32BitConstants(XUSG::CommandList* pCommandList, uint32_t index, uint32_t num32BitValuesToSet,
+		const void* pSrcData, uint32_t destOffsetIn32BitValues = 0);
+	void SetRootConstantBufferView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
+	void SetRootShaderResourceView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
+	void SetRootUnorderedAccessView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
+	void DispatchMesh(XUSG::Ultimate::CommandList* pCommandList, uint32_t ThreadGroupCountX, uint32_t ThreadGroupCountY, uint32_t ThreadGroupCountZ);
+
 protected:
+	enum CommandLayoutType
+	{
+		DISPATCH,
+		DRAW_INDEXED,
+
+		COMMAND_LAYOUT_COUNT
+	};
+
+	struct PipelineSetCommands
+	{
+		struct SetDescriptorTable
+		{
+			uint32_t Index;
+			const XUSG::DescriptorTable* pDescriptorTable;
+		};
+
+		struct SetConstants
+		{
+			uint32_t Index;
+			std::vector<uint32_t> Constants;
+		};
+
+		struct SetRootView
+		{
+			uint32_t Index;
+			const XUSG::Resource* pResource;
+			int Offset;
+		};
+
+		std::vector<SetDescriptorTable> SetDescriptorTables;
+		std::vector<SetConstants> SetConstants;
+		std::vector<SetRootView> SetRootSRVs;
+		std::vector<SetRootView> SetRootUAVs;
+		std::vector<SetRootView> SetRootCBVs;
+	};
+
+	const PipelineLayout* m_pCurrentPipelineLayout;
+	const Pipeline* m_pCurrentPipeline;
+	PipelineSetCommands m_PipelineSetCommands[FALLBACK_PIPE_COUNT];
+
 	XUSG::Device	m_device;
+	XUSG::CommandLayout m_commandLayouts[COMMAND_LAYOUT_COUNT];
 	bool			m_isMSSupported;
+	bool			m_useNative;
 };
