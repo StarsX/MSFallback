@@ -26,6 +26,13 @@ public:
 		friend MeshShaderFallbackLayer;
 		XUSG::PipelineLayout m_native;
 		XUSG::PipelineLayout m_fallbacks[FALLBACK_PIPE_COUNT];
+
+		uint32_t m_payloadUavIndexAS;
+		uint32_t m_payloadUavIndexMS;
+		uint32_t m_payloadSrvIndexMS;
+		uint32_t m_batchIndexMS;
+		uint32_t m_payloadSrvIndexVS;
+		uint32_t m_batchIndexVS;
 	private:
 		struct IndexPair
 		{
@@ -34,12 +41,6 @@ public:
 		};
 
 		std::vector<IndexPair> m_indexMaps[FALLBACK_PIPE_COUNT];
-		uint32_t m_payloadUavIndexAS;
-		uint32_t m_payloadUavIndexMS;
-		uint32_t m_payloadSrvIndexMS;
-		uint32_t m_batchIndexMS;
-		uint32_t m_payloadSrvIndexVS;
-		uint32_t m_batchIndexVS;
 	};
 
 	class Pipeline
@@ -55,8 +56,8 @@ public:
 	MeshShaderFallbackLayer(const XUSG::Device& device, bool isMSSupported);
 	virtual ~MeshShaderFallbackLayer();
 
-	bool Init(uint32_t maxMeshletCount, uint32_t groupVertCount,
-		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
+	bool Init(XUSG::DescriptorTableCache& descriptorTableCache, uint32_t maxMeshletCount,
+		uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 
 	PipelineLayout GetPipelineLayout(const XUSG::Util::PipelineLayout::uptr& utilPipelineLayout,
 		XUSG::PipelineLayoutCache& pipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
@@ -119,8 +120,16 @@ protected:
 		std::vector<SetRootView> SetRootCBVs;
 	};
 
+	bool createPayloadBuffers(uint32_t maxMeshletCount, uint32_t groupVertCount,
+		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
+	bool createCommandLayouts();
+	bool createDescriptorTables(XUSG::DescriptorTableCache& descriptorTableCache);
+
 	XUSG::Device					m_device;
 	XUSG::CommandLayout				m_commandLayouts[COMMAND_LAYOUT_COUNT];
+
+	XUSG::DescriptorTable			m_srvTable;
+	XUSG::DescriptorTable			m_uavTable;
 
 	XUSG::IndexBuffer::uptr			m_indexPayloads;
 	XUSG::StructuredBuffer::uptr	m_vertPayloads;
@@ -129,6 +138,8 @@ protected:
 	const PipelineLayout*			m_pCurrentPipelineLayout;
 	const Pipeline*					m_pCurrentPipeline;
 	PipelineSetCommands				m_pipelineSetCommands[FALLBACK_PIPE_COUNT];
+
+	uint32_t						m_batchIndexCount;
 
 	bool							m_isMSSupported;
 	bool							m_useNative;

@@ -254,6 +254,8 @@ bool Renderer::createPayloadBuffers()
 		for (auto& mesh : obj.Meshes)
 			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
 
+	const auto batchCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
+
 	{
 		struct VertexOut
 		{
@@ -271,14 +273,12 @@ bool Renderer::createPayloadBuffers()
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * MAX_PRIM_COUNT * maxMeshletCount,
+		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * MAX_PRIM_COUNT * AS_GROUP_SIZE * batchCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
 
 	{
-		const auto batchCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
-
 		m_dispatchPayloads = StructuredBuffer::MakeUnique();
 		const uint32_t stride = sizeof(uint32_t);
 		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
@@ -432,7 +432,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
 				pCommandList->SetComputeRootShaderResourceView(SRV_INPUTS, mesh.MeshletCullData->GetResource());
-				pCommandList->SetComputeRootUnorderedAccessView(UAVS, m_dispatchPayloads->GetResource());
+				pCommandList->SetComputeRootUnorderedAccessView(m_pipelineLayout.m_payloadUavIndexAS, m_dispatchPayloads->GetResource());
 
 				// Set pipeline state
 				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_AS]);
@@ -456,7 +456,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
 				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
 				pCommandList->SetComputeDescriptorTable(SRV_INPUTS, mesh.SrvTable);
-				pCommandList->SetComputeDescriptorTable(UAVS, m_uavTable);
+				pCommandList->SetComputeDescriptorTable(m_pipelineLayout.m_payloadUavIndexMS, m_uavTable);
 
 				// Set pipeline state
 				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_MS]);
@@ -465,8 +465,8 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				for (auto i = 0u; i < batchCount; ++i)
 				{
 					const int baseOffset = sizeof(DispatchArgs) * i;
-					pCommandList->SetComputeRootShaderResourceView(SRV_AS_PAYLOADS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
-					pCommandList->SetCompute32BitConstant(SRV_AS_PAYLOADS + 1, i);
+					pCommandList->SetComputeRootShaderResourceView(m_pipelineLayout.m_payloadSrvIndexMS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
+					pCommandList->SetCompute32BitConstant(m_pipelineLayout.m_batchIndexMS, i);
 					pCommandList->ExecuteIndirect(m_commandLayout, 1, m_dispatchPayloads->GetResource(), baseOffset);
 				}
 
@@ -478,7 +478,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				// Set descriptor tables
 				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
 				pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-				pCommandList->SetGraphicsDescriptorTable(SRV_INPUTS, m_srvTable);
+				pCommandList->SetGraphicsDescriptorTable(m_pipelineLayout.m_payloadSrvIndexVS, m_srvTable);
 
 				// Set pipeline state
 				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
@@ -488,7 +488,7 @@ void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
 				pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
 				for (auto i = 0u; i < batchCount; ++i)
 				{
-					pCommandList->SetGraphics32BitConstant(SRV_INPUTS + 1, i);
+					pCommandList->SetGraphics32BitConstant(m_pipelineLayout.m_batchIndexVS, i);
 					pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * AS_GROUP_SIZE, 1, 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i, 0, 0);
 				}
 			}

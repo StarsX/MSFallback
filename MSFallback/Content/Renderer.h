@@ -41,9 +41,7 @@ protected:
 		CBV_MESHINFO,
 		CBV_INSTANCE,
 		SRV_INPUTS,
-		SRV_CULL,
-		UAVS = SRV_CULL,
-		SRV_AS_PAYLOADS
+		SRV_CULL
 	};
 
 	enum ComputeShaderID : uint8_t
