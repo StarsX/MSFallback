@@ -140,7 +140,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 			flags, (wstring(name) + L"_FallbackMSLayout").c_str());
 	}
 
-	// Vertex-shader fallback for mesh shader
+	// Vertex-shader fallback for mesh shader before pixel shader
 	{
 		auto pipelineLayoutPS = convertDescriptorTableLayouts(Shader::Stage::PS, Shader::Stage::PS, pipelineLayout.m_indexMaps[FALLBACK_PS]);
 		pipelineLayout.m_payloadSrvIndexVS = static_cast<uint32_t>(pipelineLayoutPS->GetDescriptorTableLayoutKeys().size());
@@ -454,16 +454,16 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 
 			// Set descriptor tables
 			pCommandList->SetGraphicsPipelineLayout(m_pCurrentPipelineLayout->m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
-			for (const auto& command : m_pipelineSetCommands[FALLBACK_MS].SetDescriptorTables)
-				pCommandList->SetComputeDescriptorTable(command.Index, *command.pDescriptorTable);
-			for (const auto& command : m_pipelineSetCommands[FALLBACK_MS].SetConstants)
-				pCommandList->SetCompute32BitConstants(command.Index, static_cast<uint32_t>(command.Constants.size()), command.Constants.data());
-			for (const auto& command : m_pipelineSetCommands[FALLBACK_MS].SetRootCBVs)
-				pCommandList->SetComputeRootConstantBufferView(command.Index, *command.pResource, command.Offset);
-			for (const auto& command : m_pipelineSetCommands[FALLBACK_MS].SetRootSRVs)
-				pCommandList->SetComputeRootShaderResourceView(command.Index, *command.pResource, command.Offset);
-			for (const auto& command : m_pipelineSetCommands[FALLBACK_MS].SetRootUAVs)
-				pCommandList->SetComputeRootUnorderedAccessView(command.Index, *command.pResource, command.Offset);
+			for (const auto& command : m_pipelineSetCommands[FALLBACK_PS].SetDescriptorTables)
+				pCommandList->SetGraphicsDescriptorTable(command.Index, *command.pDescriptorTable);
+			for (const auto& command : m_pipelineSetCommands[FALLBACK_PS].SetConstants)
+				pCommandList->SetGraphics32BitConstants(command.Index, static_cast<uint32_t>(command.Constants.size()), command.Constants.data());
+			for (const auto& command : m_pipelineSetCommands[FALLBACK_PS].SetRootCBVs)
+				pCommandList->SetGraphicsRootConstantBufferView(command.Index, *command.pResource, command.Offset);
+			for (const auto& command : m_pipelineSetCommands[FALLBACK_PS].SetRootSRVs)
+				pCommandList->SetGraphicsRootShaderResourceView(command.Index, *command.pResource, command.Offset);
+			for (const auto& command : m_pipelineSetCommands[FALLBACK_PS].SetRootUAVs)
+				pCommandList->SetGraphicsRootUnorderedAccessView(command.Index, *command.pResource, command.Offset);
 			pCommandList->SetGraphicsDescriptorTable(m_pCurrentPipelineLayout->m_payloadSrvIndexVS, m_srvTable);
 
 			// Set pipeline state
