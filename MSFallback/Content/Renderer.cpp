@@ -68,7 +68,24 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 		obj.CbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(obj.Instance->Map(1)) - reinterpret_cast<uint8_t*>(obj.Instance->Map()));
 	}
 
-	N_RETURN(createPayloadBuffers(), false);
+	// Init mesh-shader fallback layer
+	{
+		auto maxMeshletCount = 0u;
+		for (auto& obj : m_sceneObjects)
+			for (auto& mesh : obj.Meshes)
+				maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
+
+		struct VertexOut
+		{
+			float PositionHS[4];
+			float PositionVS[3];
+			float Normal[3];
+			uint32_t MeshletIndex;
+		};
+
+		N_RETURN(m_meshShaderFallbackLayer->Init(*m_descriptorTableCache, maxMeshletCount, MAX_VERT_COUNT,
+			MAX_PRIM_COUNT, sizeof(VertexOut), AS_GROUP_SIZE), false);
+	}
 
 	// Create a depth buffer
 	m_depth = DepthStencil::MakeUnique();
@@ -78,9 +95,6 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	N_RETURN(createPipelineLayouts(isMSSupported), false);
 	N_RETURN(createPipelines(rtFormat, m_depth->GetFormat(), isMSSupported), false);
 	N_RETURN(createDescriptorTables(), false);
-
-	// create command layout
-	N_RETURN(createCommandLayout(), false);
 
 	m_cbGlobals = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbGlobals->Create(m_device, sizeof(Constants), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
@@ -165,7 +179,7 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint32_t frameIndex,
 	pCommandList->OMSetRenderTargets(1, &rtv, &m_depth->GetDSV());
 
 	if (useMeshShader) renderMS(pCommandList, frameIndex);
-	else renderFallbackLayer(pCommandList, frameIndex);
+	else renderFallback(pCommandList, frameIndex);
 }
 
 bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<Resource>& uploaders)
@@ -247,52 +261,6 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh, co
 	return true;
 }
 
-bool Renderer::createPayloadBuffers()
-{
-	auto maxMeshletCount = 0u;
-	for (auto& obj : m_sceneObjects)
-		for (auto& mesh : obj.Meshes)
-			maxMeshletCount = (max)(mesh.MeshletCount, maxMeshletCount);
-
-	struct VertexOut
-	{
-		float PositionHS[4];
-		float PositionVS[3];
-		float Normal[3];
-		uint32_t MeshletIndex;
-	};
-
-	N_RETURN(m_meshShaderFallbackLayer->Init(*m_descriptorTableCache, maxMeshletCount, MAX_VERT_COUNT,
-		MAX_PRIM_COUNT, sizeof(VertexOut), AS_GROUP_SIZE), false);
-
-	const auto batchCount = DIV_UP(maxMeshletCount, AS_GROUP_SIZE);
-
-	{
-		m_vertPayloads = StructuredBuffer::MakeUnique();
-		N_RETURN(m_vertPayloads->Create(m_device, MAX_VERT_COUNT * maxMeshletCount, sizeof(VertexOut),
-			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, L"VertexPayloads"), false);
-	}
-
-	{
-		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * MAX_PRIM_COUNT * AS_GROUP_SIZE * batchCount,
-			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
-	}
-
-	{
-		m_dispatchPayloads = StructuredBuffer::MakeUnique();
-		const uint32_t stride = sizeof(uint32_t);
-		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
-		N_RETURN(m_dispatchPayloads->Create(m_device, numElements, stride,
-			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
-	}
-
-	return true;
-}
-
 bool Renderer::createPipelineLayouts(bool isMSSupported)
 {
 	// Meshlet-culling pipeline layout
@@ -341,17 +309,9 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 	return true;
 }
 
-bool Renderer::createCommandLayout()
-{
-	IndirectArgument arg;
-	arg.Type = IndirectArgumentType::DISPATCH;
-
-	return m_device->CreateCommandLayout(m_commandLayout, sizeof(uint32_t[3]), 1, &arg);
-}
-
 bool Renderer::createDescriptorTables()
 {
-	// SRVs
+	// Meshlet SRVs
 	for (auto& obj : m_sceneObjects)
 	{
 		for (auto& mesh : obj.Meshes)
@@ -367,25 +327,6 @@ bool Renderer::createDescriptorTables()
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 			X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 		}
-	}
-
-	// Payload UAVs
-	{
-		const Descriptor descriptors[] =
-		{
-			m_vertPayloads->GetUAV(),
-			m_indexPayloads->GetUAV()
-		};
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
-	}
-
-	// Payload SRVs
-	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, 1, &m_vertPayloads->GetSRV());
-		X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 	}
 
 	return true;
@@ -415,91 +356,7 @@ void Renderer::renderMS(Ultimate::CommandList* pCommandList, uint32_t frameIndex
 	}
 }
 
-void Renderer::renderFallback(CommandList* pCommandList, uint32_t frameIndex)
-{
-	for (auto& obj : m_sceneObjects)
-	{
-		for (auto& mesh : obj.Meshes)
-		{
-			// Set barrier
-			ResourceBarrier barriers[3];
-			auto numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-
-			const auto batchCount = DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE);
-
-			// Amplification fallback
-			{
-				// Set descriptor tables
-				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_AS]);
-				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
-				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
-				pCommandList->SetComputeRootShaderResourceView(SRV_INPUTS, mesh.MeshletCullData->GetResource());
-				pCommandList->SetComputeRootUnorderedAccessView(m_pipelineLayout.m_payloadUavIndexAS, m_dispatchPayloads->GetResource());
-
-				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_AS]);
-
-				// Record commands.
-				pCommandList->Dispatch(batchCount, 1, 1);
-			}
-
-			// Set barriers
-			numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-			numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
-			numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::INDIRECT_ARGUMENT |
-				ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-			pCommandList->Barrier(numBarriers, barriers);
-
-			// Mesh-shader fallback
-			{
-				// Set descriptor tables
-				pCommandList->SetComputePipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_MS]);
-				pCommandList->SetComputeRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-				pCommandList->SetComputeRootConstantBufferView(CBV_MESHINFO, mesh.MeshInfo->GetResource());
-				pCommandList->SetComputeRootConstantBufferView(CBV_INSTANCE, obj.Instance->GetResource(), obj.CbvStride * frameIndex);
-				pCommandList->SetComputeDescriptorTable(SRV_INPUTS, mesh.SrvTable);
-				pCommandList->SetComputeDescriptorTable(m_pipelineLayout.m_payloadUavIndexMS, m_uavTable);
-
-				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_MS]);
-
-				// Record commands.
-				for (auto i = 0u; i < batchCount; ++i)
-				{
-					const int baseOffset = sizeof(DispatchArgs) * i;
-					pCommandList->SetComputeRootShaderResourceView(m_pipelineLayout.m_payloadSrvIndexMS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
-					pCommandList->SetCompute32BitConstant(m_pipelineLayout.m_batchIndexMS, i);
-					pCommandList->ExecuteIndirect(m_commandLayout, 1, m_dispatchPayloads->GetResource(), baseOffset);
-				}
-
-				// Set barriers
-				numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::NON_PIXEL_SHADER_RESOURCE);
-				numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::INDEX_BUFFER, numBarriers);
-				pCommandList->Barrier(numBarriers, barriers);
-
-				// Set descriptor tables
-				pCommandList->SetGraphicsPipelineLayout(m_pipelineLayout.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
-				pCommandList->SetGraphicsRootConstantBufferView(CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
-				pCommandList->SetGraphicsDescriptorTable(m_pipelineLayout.m_payloadSrvIndexVS, m_srvTable);
-
-				// Set pipeline state
-				pCommandList->SetPipelineState(m_pipeline.m_fallbacks[MeshShaderFallbackLayer::FALLBACK_PS]);
-
-				// Record commands.
-				pCommandList->IASetPrimitiveTopology(PrimitiveTopology::TRIANGLELIST);
-				pCommandList->IASetIndexBuffer(m_indexPayloads->GetIBV());
-				for (auto i = 0u; i < batchCount; ++i)
-				{
-					pCommandList->SetGraphics32BitConstant(m_pipelineLayout.m_batchIndexVS, i);
-					pCommandList->DrawIndexed(3 * MAX_PRIM_COUNT * AS_GROUP_SIZE, 1, 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE * i, 0, 0);
-				}
-			}
-		}
-	}
-}
-
-void Renderer::renderFallbackLayer(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex)
+void Renderer::renderFallback(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex)
 {
 	m_meshShaderFallbackLayer->EnableNativeMeshShader(false);
 

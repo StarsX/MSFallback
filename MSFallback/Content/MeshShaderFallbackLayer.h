@@ -22,34 +22,33 @@ public:
 	{
 	public:
 		bool IsValid(bool isMSSupported) const;
-	//private:
-		friend MeshShaderFallbackLayer;
 		XUSG::PipelineLayout m_native;
-		XUSG::PipelineLayout m_fallbacks[FALLBACK_PIPE_COUNT];
-
-		uint32_t m_payloadUavIndexAS;
-		uint32_t m_payloadUavIndexMS;
-		uint32_t m_payloadSrvIndexMS;
-		uint32_t m_batchIndexMS;
-		uint32_t m_payloadSrvIndexVS;
-		uint32_t m_batchIndexVS;
 	private:
+		friend MeshShaderFallbackLayer;
 		struct IndexPair
 		{
 			uint32_t Cmd;
 			uint32_t Prm;
 		};
 
+		XUSG::PipelineLayout m_fallbacks[FALLBACK_PIPE_COUNT];
+
 		std::vector<IndexPair> m_indexMaps[FALLBACK_PIPE_COUNT];
+		uint32_t m_payloadUavIndexAS;
+		uint32_t m_payloadUavIndexMS;
+		uint32_t m_payloadSrvIndexMS;
+		uint32_t m_batchIndexMS;
+		uint32_t m_payloadSrvIndexVS;
+		uint32_t m_batchIndexVS;
 	};
 
 	class Pipeline
 	{
 	public:
 		bool IsValid(bool isMSSupported) const;
-	//private:
-		friend MeshShaderFallbackLayer;
 		XUSG::Pipeline m_native;
+	private:
+		friend MeshShaderFallbackLayer;
 		XUSG::Pipeline m_fallbacks[FALLBACK_PIPE_COUNT];
 	};
 

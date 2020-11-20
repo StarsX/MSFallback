@@ -92,24 +92,13 @@ protected:
 	};
 
 	bool createMeshBuffers(XUSG::CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<XUSG::Resource>& uploaders);
-	bool createPayloadBuffers();
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
-	bool createCommandLayout();
 	bool createDescriptorTables();
 	void renderMS(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
-	void renderFallback(XUSG::CommandList* pCommandList, uint32_t frameIndex);
-	void renderFallbackLayer(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
+	void renderFallback(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
-	XUSG::CommandLayout			m_commandLayout;
-
-	XUSG::DescriptorTable		m_srvTable;
-	XUSG::DescriptorTable		m_uavTable;
-
-	XUSG::IndexBuffer::uptr		m_indexPayloads;
-	XUSG::StructuredBuffer::uptr m_vertPayloads;
-	XUSG::StructuredBuffer::uptr m_dispatchPayloads;
 
 	std::vector<SceneObject>	m_sceneObjects;
 
@@ -129,5 +118,5 @@ protected:
 	MeshShaderFallbackLayer::PipelineLayout m_pipelineLayout;
 	MeshShaderFallbackLayer::Pipeline m_pipeline;
 
-	DirectX::XMFLOAT2			m_viewport;
+	DirectX::XMFLOAT2 m_viewport;
 };
