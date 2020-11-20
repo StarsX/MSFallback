@@ -138,8 +138,6 @@ protected:
 	const Pipeline*					m_pCurrentPipeline;
 	PipelineSetCommands				m_pipelineSetCommands[FALLBACK_PIPE_COUNT];
 
-	uint32_t						m_batchIndexCount;
-
 	bool							m_isMSSupported;
 	bool							m_useNative;
 };

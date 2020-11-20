@@ -12,12 +12,16 @@ RWStructuredBuffer<uint> DispatchMeshArgs : FALLBACK_LAYER_PAYLOAD_REG(u0);
 	const uint base = stride * gid; \
 	if (gtid == 0) \
 	{ \
-		DispatchMeshArgs[base] = x; \
-		DispatchMeshArgs[base + 1] = y; \
-		DispatchMeshArgs[base + 2] = z; \
+		const uint indexCount = 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE; \
+		DispatchMeshArgs[base] = indexCount; \
+		DispatchMeshArgs[base + 1] = 1; \
+		DispatchMeshArgs[base + 2] = indexCount * gid; \
+		DispatchMeshArgs[base + 5] = x; \
+		DispatchMeshArgs[base + 6] = y; \
+		DispatchMeshArgs[base + 7] = z; \
 	} \
 	if (gtid < visibleCount) \
-		DispatchMeshArgs[base + gtid + 3] = s_Payload.MeshletIndices[gtid]; \
+		DispatchMeshArgs[base + gtid + 8] = s_Payload.MeshletIndices[gtid]; \
 }
 
 #include "ASMeshlet.hlsl"

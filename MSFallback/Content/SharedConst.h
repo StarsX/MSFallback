@@ -74,12 +74,24 @@ struct Constants
 	uint        DrawMeshlets;
 };
 
+
 struct DispatchArgs
 {
-	uint x;
-	uint y;
-	uint z;
-	uint MeshletIndices[AS_GROUP_SIZE];
+	struct DrawIndexedArgs
+	{
+		uint indexCountPerInstance;
+		uint instanceCount;
+		uint startIndexLocation;
+		int baseVertexLocation;
+		uint startInstanceLocation;
+	} DrawArgs;
+	struct ASDispatchMeshArgs
+	{
+		uint x;
+		uint y;
+		uint z;
+		uint MeshletIndices[AS_GROUP_SIZE];
+	} ASDispatchArgs;
 };
 
 #define BATCH_MESHLET_SIZE AS_GROUP_SIZE

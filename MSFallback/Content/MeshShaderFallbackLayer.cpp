@@ -22,8 +22,6 @@ MeshShaderFallbackLayer::~MeshShaderFallbackLayer()
 bool MeshShaderFallbackLayer::Init(DescriptorTableCache& descriptorTableCache, uint32_t maxMeshletCount,
 	uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize)
 {
-	m_batchIndexCount = 3 * groupPrimCount * batchSize;
-
 	// Create command layouts
 	N_RETURN(createCommandLayouts(), false);
 
@@ -441,7 +439,7 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 			// Record commands.
 			for (auto i = 0u; i < batchCount; ++i)
 			{
-				const int baseOffset = sizeof(DispatchArgs) * i;
+				const int baseOffset = sizeof(DispatchArgs) * i + sizeof(DispatchArgs::DrawIndexedArgs);
 				pCommandList->SetComputeRootShaderResourceView(m_pCurrentPipelineLayout->m_payloadSrvIndexMS, m_dispatchPayloads->GetResource(), baseOffset + sizeof(uint32_t[3]));
 				pCommandList->SetCompute32BitConstant(m_pCurrentPipelineLayout->m_batchIndexMS, i);
 				pCommandList->ExecuteIndirect(m_commandLayouts[DISPATCH], 1, m_dispatchPayloads->GetResource(), baseOffset);
@@ -475,7 +473,7 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 			for (auto i = 0u; i < batchCount; ++i)
 			{
 				pCommandList->SetGraphics32BitConstant(m_pCurrentPipelineLayout->m_batchIndexVS, i);
-				pCommandList->DrawIndexed(m_batchIndexCount, 1, m_batchIndexCount * i, 0, 0);
+				pCommandList->ExecuteIndirect(m_commandLayouts[DRAW_INDEXED], 1, m_dispatchPayloads->GetResource(), sizeof(DispatchArgs) * i);
 			}
 		}
 	}
@@ -484,8 +482,6 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uint32_t groupVertCount,
 	uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize)
 {
-	const auto batchCount = DIV_UP(maxMeshletCount, batchSize);
-
 	{
 		m_vertPayloads = StructuredBuffer::MakeUnique();
 		N_RETURN(m_vertPayloads->Create(m_device, groupVertCount * maxMeshletCount, vertexStride,
@@ -495,12 +491,14 @@ bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uin
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * groupPrimCount * batchSize * batchCount,//maxMeshletCount,
+		N_RETURN(m_indexPayloads->Create(m_device, sizeof(uint16_t[3]) * groupPrimCount * maxMeshletCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
 	}
 
 	{
+		const auto batchCount = DIV_UP(maxMeshletCount, batchSize);
+
 		m_dispatchPayloads = StructuredBuffer::MakeUnique();
 		const uint32_t stride = sizeof(uint32_t);
 		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
