@@ -379,6 +379,7 @@ void MeshShaderFallbackLayer::SetRootUnorderedAccessView(CommandList* pCommandLi
 void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ)
 {
 	if (m_useNative) pCommandList->DispatchMesh(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+	else
 	{
 		// Set barrier
 		ResourceBarrier barriers[3];

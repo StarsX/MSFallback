@@ -95,8 +95,6 @@ protected:
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
 	bool createDescriptorTables();
-	void renderMS(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
-	void renderFallback(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex);
 
 	XUSG::Device m_device;
 
