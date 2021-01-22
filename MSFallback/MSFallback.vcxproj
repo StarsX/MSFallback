@@ -163,20 +163,28 @@ COPY /Y "$(ProjectDir)XUSG\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.2</ShaderModel>
     </FxCompile>
     <FxCompile Include="Content\Shaders\ASMeshlet.hlsl">
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.4</ShaderModel>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/T as_6_5</AdditionalOptions>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.4</ShaderModel>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/T as_6_5</AdditionalOptions>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.5</ShaderModel>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </AdditionalOptions>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.5</ShaderModel>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </AdditionalOptions>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Amplification</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Amplification</ShaderType>
     </FxCompile>
     <FxCompile Include="Content\Shaders\MSMeshlet.hlsl">
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.4</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.5</ShaderModel>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </PreprocessorDefinitions>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.4</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.5</ShaderModel>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PreprocessorDefinitions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/T ms_6_5</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/T ms_6_5</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </AdditionalOptions>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Mesh</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Mesh</ShaderType>
     </FxCompile>
     <FxCompile Include="Content\Shaders\PSMeshlet.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
