@@ -72,8 +72,8 @@ void main(
 	uint gtid : SV_GroupThreadID,
 	uint gid : SV_GroupID,
 	in payload Payload payload,
-	out vertices VertexOut verts[MAX_VERT_COUNT],
-	out indices uint3 tris[MAX_PRIM_COUNT]
+	out vertices VertexOut verts[MAX_VERTS],
+	out indices uint3 tris[MAX_PRIMS]
 )
 {
 	// Load the meshlet from the AS payload data

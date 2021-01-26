@@ -12,7 +12,7 @@ RWStructuredBuffer<uint> DispatchMeshArgs : FALLBACK_LAYER_PAYLOAD_REG(u0);
 	const uint base = stride * gid; \
 	if (gtid == 0) \
 	{ \
-		const uint indexCount = 3 * MAX_PRIM_COUNT * AS_GROUP_SIZE; \
+		const uint indexCount = 3 * MAX_PRIMS * AS_GROUP_SIZE; \
 		DispatchMeshArgs[base] = indexCount; \
 		DispatchMeshArgs[base + 1] = 1; \
 		DispatchMeshArgs[base + 2] = indexCount * gid; \

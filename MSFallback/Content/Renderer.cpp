@@ -83,8 +83,8 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 			uint32_t MeshletIndex;
 		};
 
-		N_RETURN(m_meshShaderFallbackLayer->Init(*m_descriptorTableCache, maxMeshletCount, MAX_VERT_COUNT,
-			MAX_PRIM_COUNT, sizeof(VertexOut), AS_GROUP_SIZE), false);
+		N_RETURN(m_meshShaderFallbackLayer->Init(*m_descriptorTableCache, maxMeshletCount, MAX_VERTS,
+			MAX_PRIMS, sizeof(VertexOut), AS_GROUP_SIZE), false);
 	}
 
 	// Create a depth buffer

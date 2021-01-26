@@ -15,8 +15,8 @@ static const float g_zFar = 300.0f;
 #define FALLBACK_LAYER_PAYLOAD_REG_SPACE(r, s) register (r, REG_SPACE(s))
 #define FALLBACK_LAYER_PAYLOAD_REG(r) FALLBACK_LAYER_PAYLOAD_REG_SPACE(r, FALLBACK_LAYER_PAYLOAD_SPACE)
 
-#define MAX_PRIM_COUNT	126
-#define MAX_VERT_COUNT	64
+#define MAX_PRIMS 126
+#define MAX_VERTS 64
 
 //*********************************************************
 //
@@ -95,4 +95,4 @@ struct DispatchArgs
 };
 
 #define BATCH_MESHLET_SIZE AS_GROUP_SIZE
-#define BATCH_VERTEX_SIZE (MAX_VERT_COUNT * BATCH_MESHLET_SIZE)
+#define BATCH_VERTEX_SIZE (MAX_VERTS * BATCH_MESHLET_SIZE)
