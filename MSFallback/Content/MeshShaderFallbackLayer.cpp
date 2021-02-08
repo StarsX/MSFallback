@@ -201,14 +201,19 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		{
 			void* PipelineLayout;
 			void* Shaders[NUM_STAGE];
-			void* Blend;
-			void* Rasterizer;
-			void* DepthStencil;
+			const Graphics::Blend* pBlend;
+			const Graphics::Rasterizer* pRasterizer;
+			const Graphics::DepthStencil* pDepthStencil;
+			const void* pCachedBlob;
+			size_t CachedBlobSize;
 			PrimitiveTopologyType PrimTopologyType;
 			uint8_t	NumRenderTargets;
 			Format RTVFormats[8];
 			Format	DSVFormat;
 			uint8_t	SampleCount;
+			uint8_t SampleQuality;
+			uint32_t SampleMask;
+			uint32_t NodeMask;
 		};
 
 		const auto& pKey = reinterpret_cast<const Key*>(state->GetKey().c_str());
@@ -218,14 +223,17 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		gState->SetShader(Shader::Stage::VS, vsMS);
 		if (pKey->Shaders[PS]) gState->SetShader(Shader::Stage::PS, reinterpret_cast<Blob::element_type*>(pKey->Shaders[PS]));
 
-		if (pKey->Blend) gState->OMSetBlendState(make_shared<Graphics::Blend::element_type>(*reinterpret_cast<Graphics::Blend::element_type*>(pKey->Blend)));
-		if (pKey->Rasterizer) gState->RSSetState(make_shared<Graphics::Rasterizer::element_type>(*reinterpret_cast<Graphics::Rasterizer::element_type*>(pKey->Rasterizer)));
-		if (pKey->DepthStencil) gState->DSSetState(make_shared<Graphics::DepthStencil::element_type>(*reinterpret_cast<Graphics::DepthStencil::element_type*>(pKey->DepthStencil)));
+		if (pKey->pBlend) gState->OMSetBlendState(pKey->pBlend, pKey->SampleMask);
+		if (pKey->pRasterizer) gState->RSSetState(pKey->pRasterizer);
+		if (pKey->pDepthStencil) gState->DSSetState(pKey->pDepthStencil);
+		if (pKey->pCachedBlob) gState->SetCachedPipeline(pKey->pCachedBlob, pKey->CachedBlobSize);
 		gState->IASetPrimitiveTopologyType(pKey->PrimTopologyType);
 
 		gState->OMSetNumRenderTargets(pKey->NumRenderTargets);
 		for (auto i = 0; i < 8; ++i) gState->OMSetRTVFormat(i, pKey->RTVFormats[i]);
 		gState->OMSetDSVFormat(pKey->DSVFormat);
+
+		gState->OMSetSample(pKey->SampleCount, pKey->SampleQuality);
 
 		pipeline.m_fallbacks[FALLBACK_PS] = gState->GetPipeline(graphicsPipelineCache, (wstring(name) + L"_FallbackPS").c_str());
 	}
