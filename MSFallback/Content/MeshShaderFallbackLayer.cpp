@@ -118,7 +118,8 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		const auto pipelineLayoutAS = convertDescriptorTableLayouts(Shader::Stage::AS, Shader::Stage::CS, pipelineLayout.m_indexMaps[FALLBACK_AS]);
 		pipelineLayout.m_payloadUavIndexAS = static_cast<uint32_t>(pipelineLayoutAS->GetDescriptorTableLayoutKeys().size());
 
-		pipelineLayoutAS->SetRootUAV(pipelineLayout.m_payloadUavIndexAS, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // AS payload buffer
+		pipelineLayoutAS->SetRootUAV(pipelineLayout.m_payloadUavIndexAS, 0, FALLBACK_LAYER_PAYLOAD_SPACE,
+			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE | DescriptorFlag::DESCRIPTORS_VOLATILE); // AS payload buffer
 		pipelineLayout.m_fallbacks[FALLBACK_AS] = pipelineLayoutAS->GetPipelineLayout(pipelineLayoutCache,
 			flags, (wstring(name) + L"_FallbackASLayout").c_str());
 	}
@@ -131,8 +132,9 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		pipelineLayout.m_payloadSrvIndexMS = pipelineLayout.m_payloadUavIndexMS + 1;
 		pipelineLayout.m_batchIndexMS = pipelineLayout.m_payloadSrvIndexMS + 1;
 
-		pipelineLayoutMS->SetRange(pipelineLayout.m_payloadUavIndexMS, DescriptorType::UAV, 2, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // VB and IB payloads
-		pipelineLayoutMS->SetRootSRV(pipelineLayout.m_payloadSrvIndexMS, 0, FALLBACK_LAYER_PAYLOAD_SPACE, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE); // AS payload buffer
+		pipelineLayoutMS->SetRange(pipelineLayout.m_payloadUavIndexMS, DescriptorType::UAV, 2, 0,
+			FALLBACK_LAYER_PAYLOAD_SPACE, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE); // VB and IB payloads
+		pipelineLayoutMS->SetRootSRV(pipelineLayout.m_payloadSrvIndexMS, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // AS payload buffer
 		pipelineLayoutMS->SetConstants(pipelineLayout.m_batchIndexMS, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE); // Batch index
 		pipelineLayout.m_fallbacks[FALLBACK_MS] = pipelineLayoutMS->GetPipelineLayout(pipelineLayoutCache,
 			flags, (wstring(name) + L"_FallbackMSLayout").c_str());
