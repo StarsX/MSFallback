@@ -146,7 +146,8 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 		pipelineLayout.m_payloadSrvIndexVS = static_cast<uint32_t>(pipelineLayoutPS->GetDescriptorTableLayoutKeys().size());
 		pipelineLayout.m_batchIndexVS = pipelineLayout.m_payloadSrvIndexVS + 1;
 
-		pipelineLayoutPS->SetRange(pipelineLayout.m_payloadSrvIndexVS, DescriptorType::SRV, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE);
+		pipelineLayoutPS->SetRange(pipelineLayout.m_payloadSrvIndexVS, DescriptorType::SRV, 1, 0,
+			FALLBACK_LAYER_PAYLOAD_SPACE, DescriptorFlag::DESCRIPTORS_VOLATILE);
 		pipelineLayoutPS->SetShaderStage(pipelineLayout.m_payloadSrvIndexVS, Shader::Stage::VS);
 		pipelineLayoutPS->SetConstants(pipelineLayout.m_batchIndexVS, 1, 0, FALLBACK_LAYER_PAYLOAD_SPACE, Shader::Stage::VS); // Batch index
 		pipelineLayout.m_fallbacks[FALLBACK_PS] = pipelineLayoutPS->GetPipelineLayout(pipelineLayoutCache,
@@ -392,7 +393,7 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 	else
 	{
 		// Set barrier
-		ResourceBarrier barriers[3];
+		ResourceBarrier barriers[2];
 		auto numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
 
 		const auto batchCount = threadGroupCountX * threadGroupCountY * threadGroupCountZ;
@@ -422,10 +423,10 @@ void MeshShaderFallbackLayer::DispatchMesh(Ultimate::CommandList* pCommandList, 
 		}
 
 		// Set barriers
-		numBarriers = m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);
-		numBarriers = m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS, numBarriers);
+		m_vertPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);	// Promotion
+		m_indexPayloads->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS);	// Promotion
 		numBarriers = m_dispatchPayloads->SetBarrier(barriers, ResourceState::INDIRECT_ARGUMENT |
-			ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
+			ResourceState::NON_PIXEL_SHADER_RESOURCE);
 		pCommandList->Barrier(numBarriers, barriers);
 
 		// Mesh-shader fallback

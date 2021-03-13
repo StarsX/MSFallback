@@ -89,7 +89,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 
 	// Create a depth buffer
 	m_depth = DepthStencil::MakeUnique();
-	N_RETURN(m_depth->Create(m_device, width, height), false);
+	N_RETURN(m_depth->Create(m_device, width, height, Format::D24_UNORM_S8_UINT, ResourceFlag::DENY_SHADER_RESOURCE), false);
 
 	// Create pipelines
 	N_RETURN(createPipelineLayouts(isMSSupported), false);
