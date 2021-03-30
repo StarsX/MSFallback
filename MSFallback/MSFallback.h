@@ -44,7 +44,7 @@ public:
 	virtual void ParseCommandLineArgs(wchar_t* argv[], int argc);
 
 private:
-	static const uint32_t FrameCount = Renderer::FrameCount;
+	static const uint8_t FrameCount = Renderer::FrameCount;
 
 	// Pipeline objects.
 	XUSG::Viewport			m_viewport;

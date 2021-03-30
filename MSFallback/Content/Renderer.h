@@ -32,7 +32,7 @@ public:
 	void Render(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex,
 		const XUSG::Descriptor& rtv, bool useMeshShader = true);
 
-	static const uint32_t FrameCount = 3;
+	static const uint8_t FrameCount = 3;
 
 protected:
 	enum PipelineLayoutSlot : uint8_t
