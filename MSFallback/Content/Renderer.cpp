@@ -103,7 +103,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	return true;
 }
 
-void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, const DirectX::XMMATRIX* pProj, const XMFLOAT3& eyePt)
+void Renderer::UpdateFrame(uint8_t frameIndex, CXMMATRIX view, const DirectX::XMMATRIX* pProj, const XMFLOAT3& eyePt)
 {
 	// Global constants
 	{
@@ -161,7 +161,7 @@ void Renderer::UpdateFrame(uint32_t frameIndex, CXMMATRIX view, const DirectX::X
 	}
 }
 
-void Renderer::Render(Ultimate::CommandList* pCommandList, uint32_t frameIndex,
+void Renderer::Render(Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 	const Descriptor& rtv, bool useMeshShader)
 {
 	const DescriptorPool descriptorPools[] = { m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };

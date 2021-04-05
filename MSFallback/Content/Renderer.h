@@ -27,9 +27,9 @@ public:
 		XUSG::Format rtFormat, std::vector<XUSG::Resource>& uploaders,
 		uint32_t objCount, const std::wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported);
 
-	void UpdateFrame(uint32_t frameIndex, DirectX::CXMMATRIX view,
+	void UpdateFrame(uint8_t frameIndex, DirectX::CXMMATRIX view,
 		const DirectX::XMMATRIX* pProj, const DirectX::XMFLOAT3& eyePt);
-	void Render(XUSG::Ultimate::CommandList* pCommandList, uint32_t frameIndex,
+	void Render(XUSG::Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 		const XUSG::Descriptor& rtv, bool useMeshShader = true);
 
 	static const uint8_t FrameCount = 3;
