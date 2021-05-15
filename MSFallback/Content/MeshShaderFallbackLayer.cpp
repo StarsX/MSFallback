@@ -90,7 +90,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 						indexMaps[n] = { uavIndex++, index };
 						break;
 					case DescriptorType::ROOT_CBV:
-						pipelineLayout->SetRootCBV(index, pRanges->BaseBinding, pRanges->Space, pRanges->Flags, stage);
+						pipelineLayout->SetRootCBV(index, pRanges->BaseBinding, pRanges->Space, stage);
 						indexMaps[n] = { cbvIndex++, index };
 						break;
 					default:

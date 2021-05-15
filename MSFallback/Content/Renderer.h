@@ -103,7 +103,6 @@ protected:
 	XUSG::DepthStencil::uptr	m_depth;
 
 	XUSG::ConstantBuffer::uptr	m_cbGlobals;
-	uint32_t					m_cbvStride;
 
 	XUSG::ShaderPool::uptr					m_shaderPool;
 	XUSG::Graphics::PipelineCache::uptr		m_graphicsPipelineCache;

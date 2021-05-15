@@ -64,7 +64,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 		XMStoreFloat3x4(&obj.World, world);
 
 		obj.Instance = ConstantBuffer::MakeUnique();
-		N_RETURN(obj.Instance->Create(m_device, sizeof(Instance), FrameCount, nullptr, MemoryType::UPLOAD, L"CBInstance"), false);
+		N_RETURN(obj.Instance->Create(m_device, sizeof(Instance[FrameCount]), FrameCount, nullptr, MemoryType::UPLOAD, L"CBInstance"), false);
 		obj.CbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(obj.Instance->Map(1)) - reinterpret_cast<uint8_t*>(obj.Instance->Map()));
 	}
 
@@ -97,8 +97,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	N_RETURN(createDescriptorTables(), false);
 
 	m_cbGlobals = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbGlobals->Create(m_device, sizeof(Constants), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
-	m_cbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(m_cbGlobals->Map(1)) - reinterpret_cast<uint8_t*>(m_cbGlobals->Map()));
+	N_RETURN(m_cbGlobals->Create(m_device, sizeof(Constants[FrameCount]), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
 
 	return true;
 }
@@ -170,7 +169,7 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 	// Set descriptor tables
 	m_meshShaderFallbackLayer->EnableNativeMeshShader(useMeshShader);
 	m_meshShaderFallbackLayer->SetPipelineLayout(pCommandList, m_pipelineLayout);
-	m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbvStride * frameIndex);
+	m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_GLOBALS, m_cbGlobals->GetResource(), m_cbGlobals->GetCBVOffset(frameIndex));
 
 	// Set pipeline state
 	m_meshShaderFallbackLayer->SetPipelineState(pCommandList, m_pipeline);
@@ -284,9 +283,9 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 	// Meshlet-culling pipeline layout
 	{
 		const auto pipelineLayout = Util::PipelineLayout::MakeUnique();
-		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1, 0, DescriptorFlag::DATA_STATIC);
-		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2, 0, DescriptorFlag::DATA_STATIC);
+		pipelineLayout->SetRootCBV(CBV_GLOBALS, 0);
+		pipelineLayout->SetRootCBV(CBV_MESHINFO, 1);
+		pipelineLayout->SetRootCBV(CBV_INSTANCE, 2);
 		pipelineLayout->SetRange(SRV_INPUTS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRV_INPUTS, Shader::MS);
 		pipelineLayout->SetRootSRV(SRV_CULL, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
