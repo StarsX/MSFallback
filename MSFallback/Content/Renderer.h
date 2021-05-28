@@ -20,11 +20,11 @@ public:
 		bool     DrawMeshlets;
 	};
 
-	Renderer(const XUSG::Device& device);
+	Renderer(const XUSG::Device::sptr& device);
 	virtual ~Renderer();
 
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
-		XUSG::Format rtFormat, std::vector<XUSG::Resource>& uploaders,
+		XUSG::Format rtFormat, std::vector<XUSG::Resource::uptr>& uploaders,
 		uint32_t objCount, const std::wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported);
 
 	void UpdateFrame(uint8_t frameIndex, DirectX::CXMMATRIX view,
@@ -91,12 +91,13 @@ protected:
 		DirectX::XMFLOAT3X4 World;
 	};
 
-	bool createMeshBuffers(XUSG::CommandList* pCommandList, ObjectMesh& mesh, const Mesh& meshData, std::vector<XUSG::Resource>& uploaders);
+	bool createMeshBuffers(XUSG::CommandList* pCommandList, ObjectMesh& mesh,
+		const Mesh& meshData, std::vector<XUSG::Resource::uptr>& uploaders);
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
 	bool createDescriptorTables();
 
-	XUSG::Device m_device;
+	XUSG::Device::sptr m_device;
 
 	std::vector<SceneObject>	m_sceneObjects;
 

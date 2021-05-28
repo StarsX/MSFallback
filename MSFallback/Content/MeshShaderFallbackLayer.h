@@ -52,22 +52,22 @@ public:
 		XUSG::Pipeline m_fallbacks[FALLBACK_PIPE_COUNT];
 	};
 
-	MeshShaderFallbackLayer(const XUSG::Device& device, bool isMSSupported);
+	MeshShaderFallbackLayer(const XUSG::Device::sptr& device, bool isMSSupported);
 	virtual ~MeshShaderFallbackLayer();
 
-	bool Init(XUSG::DescriptorTableCache& descriptorTableCache, uint32_t maxMeshletCount,
+	bool Init(XUSG::DescriptorTableCache* pDescriptorTableCache, uint32_t maxMeshletCount,
 		uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 
-	PipelineLayout GetPipelineLayout(const XUSG::Util::PipelineLayout::uptr& utilPipelineLayout,
-		XUSG::PipelineLayoutCache& pipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
+	PipelineLayout GetPipelineLayout(XUSG::Util::PipelineLayout* pUtilPipelineLayout,
+		XUSG::PipelineLayoutCache* pPipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
 		const wchar_t* name = nullptr);
 
 	Pipeline GetPipeline(const PipelineLayout& pipelineLayout,
 		const XUSG::Blob& csAS, const XUSG::Blob& csMS,
-		const XUSG::Blob& vsMS, const XUSG::MeshShader::State::uptr& state,
-		XUSG::MeshShader::PipelineCache& meshShaderPipelineCache,
-		XUSG::Compute::PipelineCache& computePipelineCache,
-		XUSG::Graphics::PipelineCache& graphicsPipelineCache,
+		const XUSG::Blob& vsMS, XUSG::MeshShader::State* pState,
+		XUSG::MeshShader::PipelineCache* pMeshShaderPipelineCache,
+		XUSG::Compute::PipelineCache* pComputePipelineCache,
+		XUSG::Graphics::PipelineCache* pGraphicsPipelineCache,
 		const wchar_t* name = nullptr);
 
 	void EnableNativeMeshShader(bool enable);
@@ -77,9 +77,9 @@ public:
 	void Set32BitConstant(XUSG::CommandList* pCommandList, uint32_t index, uint32_t srcData, uint32_t destOffsetIn32BitValues = 0);
 	void Set32BitConstants(XUSG::CommandList* pCommandList, uint32_t index, uint32_t num32BitValuesToSet,
 		const void* pSrcData, uint32_t destOffsetIn32BitValues = 0);
-	void SetRootConstantBufferView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
-	void SetRootShaderResourceView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
-	void SetRootUnorderedAccessView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource& resource, int offset = 0);
+	void SetRootConstantBufferView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource* pResource, int offset = 0);
+	void SetRootShaderResourceView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource* pResource, int offset = 0);
+	void SetRootUnorderedAccessView(XUSG::CommandList* pCommandList, uint32_t index, const XUSG::Resource* pResource, int offset = 0);
 	void DispatchMesh(XUSG::Ultimate::CommandList* pCommandList, uint32_t ThreadGroupCountX, uint32_t ThreadGroupCountY, uint32_t ThreadGroupCountZ);
 
 protected:
@@ -122,10 +122,10 @@ protected:
 	bool createPayloadBuffers(uint32_t maxMeshletCount, uint32_t groupVertCount,
 		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 	bool createCommandLayouts();
-	bool createDescriptorTables(XUSG::DescriptorTableCache& descriptorTableCache);
+	bool createDescriptorTables(XUSG::DescriptorTableCache* pDescriptorTableCache);
 
-	XUSG::Device					m_device;
-	XUSG::CommandLayout				m_commandLayouts[COMMAND_LAYOUT_COUNT];
+	XUSG::Device::sptr				m_device;
+	XUSG::CommandLayout::uptr		m_commandLayouts[COMMAND_LAYOUT_COUNT];
 
 	XUSG::DescriptorTable			m_srvTable;
 	XUSG::DescriptorTable			m_uavTable;
