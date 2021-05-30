@@ -111,7 +111,6 @@ COPY /Y "$(ProjectDir)XUSG\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\
     <ClInclude Include="MSFallback.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="XUSG\Core\XUSG.h" />
-    <ClInclude Include="XUSG\Core\XUSG_DX12.h" />
     <ClInclude Include="XUSG\Optional\XUSGObjLoader.h" />
     <ClInclude Include="XUSG\Ultimate\XUSGUltimate.h" />
   </ItemGroup>
