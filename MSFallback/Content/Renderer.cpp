@@ -64,8 +64,8 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 		XMStoreFloat3x4(&obj.World, world);
 
 		obj.Instance = ConstantBuffer::MakeUnique();
-		N_RETURN(obj.Instance->Create(m_device.get(), sizeof(Instance[FrameCount]), FrameCount, nullptr, MemoryType::UPLOAD, L"CBInstance"), false);
-		obj.CbvStride = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(obj.Instance->Map(1)) - reinterpret_cast<uint8_t*>(obj.Instance->Map()));
+		N_RETURN(obj.Instance->Create(m_device.get(), sizeof(Instance[FrameCount]), FrameCount,
+			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBInstance"), false);
 	}
 
 	// Init mesh-shader fallback layer
@@ -97,7 +97,8 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 	N_RETURN(createDescriptorTables(), false);
 
 	m_cbGlobals = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbGlobals->Create(m_device.get(), sizeof(Constants[FrameCount]), FrameCount, nullptr, MemoryType::UPLOAD, L"CBGbolals"), false);
+	N_RETURN(m_cbGlobals->Create(m_device.get(), sizeof(Constants[FrameCount]), FrameCount,
+		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBGbolals"), false);
 
 	return true;
 }
@@ -187,7 +188,7 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 	// Record commands.
 	for (auto& obj : m_sceneObjects)
 	{
-		m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_INSTANCE, obj.Instance.get(), obj.CbvStride * frameIndex);
+		m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_INSTANCE, obj.Instance.get(), obj.Instance->GetCBVOffset(frameIndex));
 
 		for (auto& mesh : obj.Meshes)
 		{
@@ -264,7 +265,8 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 	{
 		auto& meshInfo = mesh.MeshInfo;
 		meshInfo = ConstantBuffer::MakeUnique();
-		N_RETURN(meshInfo->Create(m_device.get(), sizeof(MeshInfo), 1, nullptr, MemoryType::DEFAULT, L"CBMeshInfo"), false);
+		N_RETURN(meshInfo->Create(m_device.get(), sizeof(MeshInfo), 1, nullptr,
+			MemoryType::DEFAULT, MemoryFlag::NONE, L"CBMeshInfo"), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
 		MeshInfo info = {};

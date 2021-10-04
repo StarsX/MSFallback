@@ -28,15 +28,16 @@ MSFallback::MSFallback(uint32_t width, uint32_t height, std::wstring name) :
 	m_showFPS(true),
 	m_pausing(false),
 	m_tracking(false),
-	m_modelFilenames{ L"Media/Dragon_LOD0.bin" },
+	m_modelFilenames{ L"Assets/Dragon_LOD0.bin" },
 	m_objDefs{ { {}, {}, 0.2f, true, true } }  // View Model
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	AllocConsole();
 	FILE* stream;
-	freopen_s(&stream, "CONOUT$", "w+t", stdout);
 	freopen_s(&stream, "CONIN$", "r+t", stdin);
+	freopen_s(&stream, "CONOUT$", "w+t", stdout);
+	freopen_s(&stream, "CONOUT$", "w+t", stderr);
 #endif
 }
 
@@ -107,7 +108,7 @@ void MSFallback::LoadPipeline()
 
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
-	N_RETURN(m_swapChain->Create(factory.Get(), Win32Application::GetHwnd(), m_commandQueue.get(),
+	N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
 		FrameCount, m_width, m_height, Format::R8G8B8A8_UNORM), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.

@@ -31,12 +31,6 @@
     <Filter Include="XUSG\Optional">
       <UniqueIdentifier>{cf33d033-4330-4a25-9dd9-7070c02d511a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="XUSG\Core">
-      <UniqueIdentifier>{a7f8e376-64ac-4db0-b1e5-38a3aa28fd22}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="XUSG\Ultimate">
-      <UniqueIdentifier>{0bd6b444-9286-4cf7-9670-8f847e33aded}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common\d3dx12.h">
@@ -63,14 +57,8 @@
     <ClInclude Include="XUSG\Optional\XUSGObjLoader.h">
       <Filter>XUSG\Optional</Filter>
     </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSG.h">
-      <Filter>XUSG\Core</Filter>
-    </ClInclude>
     <ClInclude Include="Content\Renderer.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Ultimate\XUSGUltimate.h">
-      <Filter>XUSG\Ultimate</Filter>
     </ClInclude>
     <ClInclude Include="MSFallback.h">
       <Filter>Header Files</Filter>
@@ -89,6 +77,12 @@
     </ClInclude>
     <ClInclude Include="Common\d3d12.h">
       <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Ultimate\XUSGUltimate.h">
+      <Filter>XUSG</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Core\XUSG.h">
+      <Filter>XUSG</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

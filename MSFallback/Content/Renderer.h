@@ -87,7 +87,6 @@ protected:
 	{
 		std::vector<ObjectMesh> Meshes;
 		XUSG::ConstantBuffer::uptr Instance;
-		uint32_t CbvStride;
 		DirectX::XMFLOAT3X4 World;
 	};
 

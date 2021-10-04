@@ -498,14 +498,14 @@ bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uin
 		m_vertPayloads = StructuredBuffer::MakeUnique();
 		N_RETURN(m_vertPayloads->Create(m_device.get(), groupVertCount * maxMeshletCount, vertexStride,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, L"VertexPayloads"), false);
+			1, nullptr, 1, nullptr, MemoryFlag::NONE, L"VertexPayloads"), false);
 	}
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
 		N_RETURN(m_indexPayloads->Create(m_device.get(), sizeof(uint16_t[3]) * groupPrimCount * maxMeshletCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, 1, nullptr, L"IndexPayloads"), false);
+			1, nullptr, 1, nullptr, 1, nullptr, MemoryFlag::NONE, L"IndexPayloads"), false);
 	}
 
 	{
@@ -516,7 +516,7 @@ bool MeshShaderFallbackLayer::createPayloadBuffers(uint32_t maxMeshletCount, uin
 		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
 		N_RETURN(m_dispatchPayloads->Create(m_device.get(), numElements, stride,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
-			1, nullptr, 1, nullptr, L"DispatchPayloads"), false);
+			1, nullptr, 1, nullptr, MemoryFlag::NONE, L"DispatchPayloads"), false);
 	}
 
 	return true;
