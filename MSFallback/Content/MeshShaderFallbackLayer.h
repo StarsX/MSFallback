@@ -52,10 +52,10 @@ public:
 		XUSG::Pipeline m_fallbacks[FALLBACK_PIPE_COUNT];
 	};
 
-	MeshShaderFallbackLayer(const XUSG::Device::sptr& device, bool isMSSupported);
+	MeshShaderFallbackLayer(bool isMSSupported);
 	virtual ~MeshShaderFallbackLayer();
 
-	bool Init(XUSG::DescriptorTableCache* pDescriptorTableCache, uint32_t maxMeshletCount,
+	bool Init(const XUSG::Device* pDevice, XUSG::DescriptorTableCache* pDescriptorTableCache, uint32_t maxMeshletCount,
 		uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 
 	PipelineLayout GetPipelineLayout(XUSG::Util::PipelineLayout* pUtilPipelineLayout,
@@ -119,12 +119,11 @@ protected:
 		std::vector<SetRootView> SetRootCBVs;
 	};
 
-	bool createPayloadBuffers(uint32_t maxMeshletCount, uint32_t groupVertCount,
+	bool createPayloadBuffers(const XUSG::Device* pDevice, uint32_t maxMeshletCount, uint32_t groupVertCount,
 		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
-	bool createCommandLayouts();
+	bool createCommandLayouts(const XUSG::Device* pDevice);
 	bool createDescriptorTables(XUSG::DescriptorTableCache* pDescriptorTableCache);
 
-	XUSG::Device::sptr				m_device;
 	XUSG::CommandLayout::uptr		m_commandLayouts[COMMAND_LAYOUT_COUNT];
 
 	XUSG::DescriptorTable			m_srvTable;

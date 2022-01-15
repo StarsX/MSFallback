@@ -20,7 +20,7 @@ public:
 		bool     DrawMeshlets;
 	};
 
-	Renderer(const XUSG::Device::sptr& device);
+	Renderer();
 	virtual ~Renderer();
 
 	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
@@ -95,8 +95,6 @@ protected:
 	bool createPipelineLayouts(bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
 	bool createDescriptorTables();
-
-	XUSG::Device::sptr m_device;
 
 	std::vector<SceneObject>	m_sceneObjects;
 

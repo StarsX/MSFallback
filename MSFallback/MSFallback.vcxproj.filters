@@ -63,9 +63,6 @@
     <ClInclude Include="MSFallback.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Content\Model.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Common\Span.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>

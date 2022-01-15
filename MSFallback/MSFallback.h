@@ -56,7 +56,7 @@ private:
 
 	bool m_isMSSupported;
 
-	XUSG::Device::sptr m_device;
+	XUSG::Device::uptr m_device;
 	XUSG::RenderTarget::uptr m_renderTargets[FrameCount];
 	XUSG::Ultimate::CommandList::uptr m_commandList;
 
