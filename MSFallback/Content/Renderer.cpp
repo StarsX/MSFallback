@@ -52,7 +52,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 			mesh.Subsets.resize(meshData.MeshletSubsets.size());
 			memcpy(mesh.Subsets.data(), meshData.MeshletSubsets.data(), sizeof(Subset) * meshData.MeshletSubsets.size());
 			mesh.MeshletCount = static_cast<uint32_t>(meshData.Meshlets.size());
-			N_RETURN(createMeshBuffers(pCommandList, mesh, meshData, uploaders), false);
+			XUSG_N_RETURN(createMeshBuffers(pCommandList, mesh, meshData, uploaders), false);
 		}
 
 		// Convert the transform definition to a matrix
@@ -65,7 +65,7 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 		XMStoreFloat3x4(&obj.World, world);
 
 		obj.Instance = ConstantBuffer::MakeUnique();
-		N_RETURN(obj.Instance->Create(pDevice, sizeof(Instance[FrameCount]), FrameCount,
+		XUSG_N_RETURN(obj.Instance->Create(pDevice, sizeof(Instance[FrameCount]), FrameCount,
 			nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBInstance"), false);
 	}
 
@@ -84,21 +84,21 @@ bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, 
 			uint32_t MeshletIndex;
 		};
 
-		N_RETURN(m_meshShaderFallbackLayer->Init(pDevice, m_descriptorTableCache.get(), maxMeshletCount,
+		XUSG_N_RETURN(m_meshShaderFallbackLayer->Init(pDevice, m_descriptorTableCache.get(), maxMeshletCount,
 			MAX_VERTS, MAX_PRIMS, sizeof(VertexOut), AS_GROUP_SIZE), false);
 	}
 
 	// Create a depth buffer
 	m_depth = DepthStencil::MakeUnique();
-	N_RETURN(m_depth->Create(pDevice, width, height, Format::D24_UNORM_S8_UINT, ResourceFlag::DENY_SHADER_RESOURCE), false);
+	XUSG_N_RETURN(m_depth->Create(pDevice, width, height, Format::D24_UNORM_S8_UINT, ResourceFlag::DENY_SHADER_RESOURCE), false);
 
 	// Create pipelines
-	N_RETURN(createPipelineLayouts(isMSSupported), false);
-	N_RETURN(createPipelines(rtFormat, m_depth->GetFormat(), isMSSupported), false);
-	N_RETURN(createDescriptorTables(), false);
+	XUSG_N_RETURN(createPipelineLayouts(isMSSupported), false);
+	XUSG_N_RETURN(createPipelines(rtFormat, m_depth->GetFormat(), isMSSupported), false);
+	XUSG_N_RETURN(createDescriptorTables(), false);
 
 	m_cbGlobals = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbGlobals->Create(pDevice, sizeof(Constants[FrameCount]), FrameCount,
+	XUSG_N_RETURN(m_cbGlobals->Create(pDevice, sizeof(Constants[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBGbolals"), false);
 
 	return true;
@@ -196,7 +196,7 @@ void Renderer::Render(Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 			m_meshShaderFallbackLayer->SetRootConstantBufferView(pCommandList, CBV_MESHINFO, mesh.MeshInfo.get());
 			m_meshShaderFallbackLayer->SetDescriptorTable(pCommandList, SRV_INPUTS, mesh.SrvTable);
 			m_meshShaderFallbackLayer->SetRootShaderResourceView(pCommandList, SRV_CULL, mesh.MeshletCullData.get());
-			m_meshShaderFallbackLayer->DispatchMesh(pCommandList, DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE), 1, 1);
+			m_meshShaderFallbackLayer->DispatchMesh(pCommandList, XUSG_DIV_UP(mesh.MeshletCount, AS_GROUP_SIZE), 1, 1);
 		}
 	}
 }
@@ -211,10 +211,10 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		const auto stride = meshData.VertexStrides[0];
 		const auto numElements = static_cast<uint32_t>(meshData.Vertices[0].size()) / stride;
 		vertices = StructuredBuffer::MakeUnique();
-		N_RETURN(vertices->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		XUSG_N_RETURN(vertices->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
-		N_RETURN(vertices->Upload(pCommandList, uploaders.back().get(), meshData.Vertices[0].data(),
+		XUSG_N_RETURN(vertices->Upload(pCommandList, uploaders.back().get(), meshData.Vertices[0].data(),
 			stride * numElements, 0, ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
@@ -223,10 +223,10 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		const uint32_t stride = sizeof(Meshlet);
 		const auto numElements = static_cast<uint32_t>(meshData.Meshlets.size());
 		meshlets = StructuredBuffer::MakeUnique();
-		N_RETURN(meshlets->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		XUSG_N_RETURN(meshlets->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
-		N_RETURN(meshlets->Upload(pCommandList, uploaders.back().get(), meshData.Meshlets.data(),
+		XUSG_N_RETURN(meshlets->Upload(pCommandList, uploaders.back().get(), meshData.Meshlets.data(),
 			stride * numElements, 0, ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
@@ -235,10 +235,10 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		const uint32_t stride = sizeof(PackedTriangle);
 		const auto numElements = static_cast<uint32_t>(meshData.PrimitiveIndices.size());
 		primitiveIndices = StructuredBuffer::MakeUnique();
-		N_RETURN(primitiveIndices->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		XUSG_N_RETURN(primitiveIndices->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
-		N_RETURN(primitiveIndices->Upload(pCommandList, uploaders.back().get(), meshData.PrimitiveIndices.data(),
+		XUSG_N_RETURN(primitiveIndices->Upload(pCommandList, uploaders.back().get(), meshData.PrimitiveIndices.data(),
 			stride * numElements, 0, ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
@@ -246,10 +246,10 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		auto& uniqueVertexIndices = mesh.UniqueVertexIndices;
 		uniqueVertexIndices = RawBuffer::MakeUnique();
 		const auto byteWidth = meshData.UniqueVertexIndices.size();
-		N_RETURN(uniqueVertexIndices->Create(pDevice, byteWidth, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		XUSG_N_RETURN(uniqueVertexIndices->Create(pDevice, byteWidth, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
-		N_RETURN(uniqueVertexIndices->Upload(pCommandList, uploaders.back().get(), meshData.UniqueVertexIndices.data(),
+		XUSG_N_RETURN(uniqueVertexIndices->Upload(pCommandList, uploaders.back().get(), meshData.UniqueVertexIndices.data(),
 			byteWidth, 0, ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
@@ -258,17 +258,17 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		const uint32_t stride = sizeof(CullData);
 		const auto numElements = static_cast<uint32_t>(meshData.CullingData.size());
 		meshletCullData = StructuredBuffer::MakeUnique();
-		N_RETURN(meshletCullData->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
+		XUSG_N_RETURN(meshletCullData->Create(pDevice, numElements, stride, ResourceFlag::NONE, MemoryType::DEFAULT), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
-		N_RETURN(meshletCullData->Upload(pCommandList, uploaders.back().get(), meshData.CullingData.data(),
+		XUSG_N_RETURN(meshletCullData->Upload(pCommandList, uploaders.back().get(), meshData.CullingData.data(),
 			stride * numElements, 0, ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 	}
 
 	{
 		auto& meshInfo = mesh.MeshInfo;
 		meshInfo = ConstantBuffer::MakeUnique();
-		N_RETURN(meshInfo->Create(pDevice, sizeof(MeshInfo), 1, nullptr,
+		XUSG_N_RETURN(meshInfo->Create(pDevice, sizeof(MeshInfo), 1, nullptr,
 			MemoryType::DEFAULT, MemoryFlag::NONE, L"CBMeshInfo"), false);
 		uploaders.emplace_back(Resource::MakeUnique());
 
@@ -278,7 +278,7 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 		info.LastMeshletVertCount = meshData.Meshlets.back().VertCount;
 		info.LastMeshletPrimCount = meshData.Meshlets.back().PrimCount;
 
-		N_RETURN(meshInfo->Upload(pCommandList, uploaders.back().get(), &info, sizeof(info)), false);
+		XUSG_N_RETURN(meshInfo->Upload(pCommandList, uploaders.back().get(), &info, sizeof(info)), false);
 	}
 
 	return true;
@@ -298,7 +298,7 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pipelineLayout.get(), m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, L"MeshletLayout");
 
-		N_RETURN(m_pipelineLayout.IsValid(isMSSupported), false);
+		XUSG_N_RETURN(m_pipelineLayout.IsValid(isMSSupported), false);
 	}
 
 	return true;
@@ -308,12 +308,12 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 {
 	// Meshlet-culling pipeline
 	{
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
-		N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
 
 		const auto state = MeshShader::State::MakeUnique();
 		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
@@ -326,7 +326,7 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 			m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_MS), m_shaderPool->GetShader(Shader::Stage::VS, VS_MESHLET),
 			state.get(), m_meshShaderPipelineCache.get(), m_computePipelineCache.get(), m_graphicsPipelineCache.get(), L"MeshletPipe");
 
-		N_RETURN(m_pipeline.IsValid(isMSSupported), false);
+		XUSG_N_RETURN(m_pipeline.IsValid(isMSSupported), false);
 	}
 
 	return true;
@@ -348,7 +348,7 @@ bool Renderer::createDescriptorTables()
 			};
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			XUSG_X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 	}
 

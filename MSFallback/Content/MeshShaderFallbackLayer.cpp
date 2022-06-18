@@ -22,13 +22,13 @@ bool MeshShaderFallbackLayer::Init(const Device* pDevice, DescriptorTableCache* 
 	uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize)
 {
 	// Create command layouts
-	N_RETURN(createCommandLayouts(pDevice), false);
+	XUSG_N_RETURN(createCommandLayouts(pDevice), false);
 
 	// Create payload buffers
-	N_RETURN(createPayloadBuffers(pDevice, maxMeshletCount, groupVertCount, groupPrimCount, vertexStride, batchSize), false);
+	XUSG_N_RETURN(createPayloadBuffers(pDevice, maxMeshletCount, groupVertCount, groupPrimCount, vertexStride, batchSize), false);
 
 	// Create descriptor tables
-	N_RETURN(createDescriptorTables(pDescriptorTableCache), false);
+	XUSG_N_RETURN(createDescriptorTables(pDescriptorTableCache), false);
 
 	return true;
 }
@@ -495,25 +495,25 @@ bool MeshShaderFallbackLayer::createPayloadBuffers(const Device* pDevice, uint32
 {
 	{
 		m_vertPayloads = StructuredBuffer::MakeUnique();
-		N_RETURN(m_vertPayloads->Create(pDevice, groupVertCount * maxMeshletCount, vertexStride,
+		XUSG_N_RETURN(m_vertPayloads->Create(pDevice, groupVertCount * maxMeshletCount, vertexStride,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, MemoryFlag::NONE, L"VertexPayloads"), false);
 	}
 
 	{
 		m_indexPayloads = IndexBuffer::MakeUnique();
-		N_RETURN(m_indexPayloads->Create(pDevice, sizeof(uint16_t[3]) * groupPrimCount * maxMeshletCount,
+		XUSG_N_RETURN(m_indexPayloads->Create(pDevice, sizeof(uint16_t[3]) * groupPrimCount * maxMeshletCount,
 			Format::R16_UINT, ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, 1, nullptr, MemoryFlag::NONE, L"IndexPayloads"), false);
 	}
 
 	{
-		const auto batchCount = DIV_UP(maxMeshletCount, batchSize);
+		const auto batchCount = XUSG_DIV_UP(maxMeshletCount, batchSize);
 
 		m_dispatchPayloads = StructuredBuffer::MakeUnique();
 		const uint32_t stride = sizeof(uint32_t);
 		const uint32_t numElements = sizeof(DispatchArgs) / stride * batchCount;
-		N_RETURN(m_dispatchPayloads->Create(pDevice, numElements, stride,
+		XUSG_N_RETURN(m_dispatchPayloads->Create(pDevice, numElements, stride,
 			ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 			1, nullptr, 1, nullptr, MemoryFlag::NONE, L"DispatchPayloads"), false);
 	}
@@ -527,13 +527,13 @@ bool MeshShaderFallbackLayer::createCommandLayouts(const Device* pDevice)
 	{
 		arg.Type = IndirectArgumentType::DISPATCH;
 		m_commandLayouts[DISPATCH] = CommandLayout::MakeUnique();
-		N_RETURN(m_commandLayouts[DISPATCH]->Create(pDevice, sizeof(uint32_t[3]), 1, &arg), false);
+		XUSG_N_RETURN(m_commandLayouts[DISPATCH]->Create(pDevice, sizeof(uint32_t[3]), 1, &arg), false);
 	}
 
 	{
 		arg.Type = IndirectArgumentType::DRAW_INDEXED;
 		m_commandLayouts[DRAW_INDEXED] = CommandLayout::MakeUnique();
-		N_RETURN(m_commandLayouts[DRAW_INDEXED]->Create(pDevice, sizeof(uint32_t[5]), 1, &arg), false);
+		XUSG_N_RETURN(m_commandLayouts[DRAW_INDEXED]->Create(pDevice, sizeof(uint32_t[5]), 1, &arg), false);
 	}
 
 	return true;
@@ -550,14 +550,14 @@ bool MeshShaderFallbackLayer::createDescriptorTables(DescriptorTableCache* pDesc
 		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
+		XUSG_X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
 	}
 
 	// Payload SRVs
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_vertPayloads->GetSRV());
-		X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
+		XUSG_X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
 	}
 
 	return true;
