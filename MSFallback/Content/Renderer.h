@@ -23,8 +23,8 @@ public:
 	Renderer();
 	virtual ~Renderer();
 
-	bool Init(XUSG::CommandList* pCommandList, uint32_t width, uint32_t height,
-		XUSG::Format rtFormat, std::vector<XUSG::Resource::uptr>& uploaders,
+	bool Init(XUSG::CommandList* pCommandList, const XUSG::DescriptorTableCache::sptr& descriptorTableCache,
+		uint32_t width, uint32_t height, XUSG::Format rtFormat, std::vector<XUSG::Resource::uptr>& uploaders,
 		uint32_t objCount, const std::wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported);
 
 	void UpdateFrame(uint8_t frameIndex, DirectX::CXMMATRIX view,
@@ -107,7 +107,7 @@ protected:
 	XUSG::Compute::PipelineCache::uptr		m_computePipelineCache;
 	XUSG::MeshShader::PipelineCache::uptr	m_meshShaderPipelineCache;
 	XUSG::PipelineLayoutCache::uptr			m_pipelineLayoutCache;
-	XUSG::DescriptorTableCache::uptr		m_descriptorTableCache;
+	XUSG::DescriptorTableCache::sptr		m_descriptorTableCache;
 
 	std::unique_ptr<MeshShaderFallbackLayer> m_meshShaderFallbackLayer;
 	MeshShaderFallbackLayer::PipelineLayout m_pipelineLayout;

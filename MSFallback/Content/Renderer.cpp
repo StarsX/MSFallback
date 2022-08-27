@@ -18,16 +18,16 @@ Renderer::~Renderer()
 {
 }
 
-bool Renderer::Init(CommandList* pCommandList, uint32_t width, uint32_t height, Format rtFormat,
-	vector<Resource::uptr>& uploaders, uint32_t objCount, const wstring* pFileNames, const ObjectDef* pObjDefs,
-	bool isMSSupported)
+bool Renderer::Init(CommandList* pCommandList, const DescriptorTableCache::sptr& descriptorTableCache,
+	uint32_t width, uint32_t height, Format rtFormat, vector<Resource::uptr>& uploaders, uint32_t objCount,
+	const wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported)
 {
 	const auto pDevice = pCommandList->GetDevice();
 	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
 	m_computePipelineCache = Compute::PipelineCache::MakeUnique(pDevice);
 	m_meshShaderPipelineCache = MeshShader::PipelineCache::MakeUnique(pDevice);
 	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(pDevice);
-	m_descriptorTableCache = DescriptorTableCache::MakeUnique(pDevice, L"DescriptorTableCache");
+	m_descriptorTableCache = descriptorTableCache;
 	m_meshShaderFallbackLayer = make_unique<MeshShaderFallbackLayer>(isMSSupported);
 
 	m_viewport.x = static_cast<float>(width);
@@ -165,9 +165,6 @@ void Renderer::UpdateFrame(uint8_t frameIndex, CXMMATRIX view, const DirectX::XM
 void Renderer::Render(Ultimate::CommandList* pCommandList, uint8_t frameIndex,
 	const Descriptor& rtv, bool useMeshShader)
 {
-	const DescriptorPool descriptorPools[] = { m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
-	pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-
 	// Set descriptor tables
 	m_meshShaderFallbackLayer->EnableNativeMeshShader(useMeshShader);
 	m_meshShaderFallbackLayer->SetPipelineLayout(pCommandList, m_pipelineLayout);

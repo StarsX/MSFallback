@@ -47,6 +47,8 @@ private:
 	static const auto FrameCount = Renderer::FrameCount;
 
 	// Pipeline objects.
+	XUSG::DescriptorTableCache::sptr m_descriptorTableCache;
+
 	XUSG::Viewport			m_viewport;
 	XUSG::RectRange			m_scissorRect;
 
