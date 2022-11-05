@@ -129,7 +129,7 @@ void MSFallback::LoadPipeline()
 	}
 
 	// Create descriptor table cache.
-	m_descriptorTableCache = DescriptorTableCache::MakeShared(m_device.get(), L"DescriptorTableCache");
+	m_descriptorTableLib = DescriptorTableLib::MakeShared(m_device.get(), L"DescriptorTableLib");
 }
 
 // Load the sample assets.
@@ -150,7 +150,7 @@ void MSFallback::LoadAssets()
 	/// <Hard Code>
 	/// Resolve pso mismatch by using'D24_UNORM_S8_UINT'
 	/// </Hard Code>
-	if (!m_renderer->Init(pCommandList, m_descriptorTableCache, m_width, m_height,
+	if (!m_renderer->Init(pCommandList, m_descriptorTableLib, m_width, m_height,
 		m_renderTargets[0]->GetFormat(), uploaders, static_cast<uint32_t>(size(m_objDefs)),
 		m_modelFilenames, m_objDefs, m_isMSSupported)) ThrowIfFailed(E_FAIL);
 
@@ -349,7 +349,7 @@ void MSFallback::PopulateCommandList()
 
 	// Record commands.
 	// Bind the descriptor pool
-	const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+	const auto descriptorPool = m_descriptorTableLib->GetDescriptorPool(CBV_SRV_UAV_POOL);
 	pCommandList->SetDescriptorPools(1, &descriptorPool);
 
 	// Set resource barrier

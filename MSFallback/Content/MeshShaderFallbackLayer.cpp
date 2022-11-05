@@ -18,7 +18,7 @@ MeshShaderFallbackLayer::~MeshShaderFallbackLayer()
 {
 }
 
-bool MeshShaderFallbackLayer::Init(const Device* pDevice, DescriptorTableCache* pDescriptorTableCache, uint32_t maxMeshletCount,
+bool MeshShaderFallbackLayer::Init(const Device* pDevice, DescriptorTableLib* pDescriptorTableLib, uint32_t maxMeshletCount,
 	uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize)
 {
 	// Create command layouts
@@ -28,13 +28,13 @@ bool MeshShaderFallbackLayer::Init(const Device* pDevice, DescriptorTableCache* 
 	XUSG_N_RETURN(createPayloadBuffers(pDevice, maxMeshletCount, groupVertCount, groupPrimCount, vertexStride, batchSize), false);
 
 	// Create descriptor tables
-	XUSG_N_RETURN(createDescriptorTables(pDescriptorTableCache), false);
+	XUSG_N_RETURN(createDescriptorTables(pDescriptorTableLib), false);
 
 	return true;
 }
 
 MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayout(Util::PipelineLayout* pUtilPipelineLayout,
-	PipelineLayoutCache* pPipelineLayoutCache, PipelineLayoutFlag flags, const wchar_t* name)
+	PipelineLayoutLib* pPipelineLayoutCache, PipelineLayoutFlag flags, const wchar_t* name)
 {
 	PipelineLayout pipelineLayout = {};
 
@@ -157,8 +157,8 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 }
 
 MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const PipelineLayout& pipelineLayout, const Blob& csAS,
-	const Blob& csMS, const Blob& vsMS, MeshShader::State* pState, MeshShader::PipelineCache* pMeshShaderPipelineCache,
-	Compute::PipelineCache* pComputePipelineCache, Graphics::PipelineCache* pGraphicsPipelineCache, const wchar_t* name)
+	const Blob& csMS, const Blob& vsMS, MeshShader::State* pState, MeshShader::PipelineLib* pMeshShaderPipelineLib,
+	Compute::PipelineLib* pComputePipelineLib, Graphics::PipelineLib* pGraphicsPipelineLib, const wchar_t* name)
 {
 	Pipeline pipeline = {};
 
@@ -166,7 +166,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 	if (m_isMSSupported)
 	{
 		pState->SetPipelineLayout(pipelineLayout.m_native);
-		pipeline.m_native = pState->GetPipeline(pMeshShaderPipelineCache, (wstring(name) + L"_Native").c_str());
+		pipeline.m_native = pState->GetPipeline(pMeshShaderPipelineLib, (wstring(name) + L"_Native").c_str());
 	}
 
 	// Compute-shader fallback for amplification shader
@@ -175,7 +175,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_AS]);
 		state->SetShader(csAS);
-		pipeline.m_fallbacks[FALLBACK_AS] = state->GetPipeline(pComputePipelineCache, (wstring(name) + L"_FallbackAS").c_str());
+		pipeline.m_fallbacks[FALLBACK_AS] = state->GetPipeline(pComputePipelineLib, (wstring(name) + L"_FallbackAS").c_str());
 	}
 
 	// Compute-shader fallback for mesh shader
@@ -184,7 +184,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_MS]);
 		state->SetShader(csMS);
-		pipeline.m_fallbacks[FALLBACK_MS] = state->GetPipeline(pComputePipelineCache, (wstring(name) + L"_FallbackMS").c_str());
+		pipeline.m_fallbacks[FALLBACK_MS] = state->GetPipeline(pComputePipelineLib, (wstring(name) + L"_FallbackMS").c_str());
 	}
 
 	// Vertex-shader fallback for mesh shader
@@ -237,7 +237,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 
 		gState->OMSetSample(pKey->SampleCount, pKey->SampleQuality);
 
-		pipeline.m_fallbacks[FALLBACK_PS] = gState->GetPipeline(pGraphicsPipelineCache, (wstring(name) + L"_FallbackPS").c_str());
+		pipeline.m_fallbacks[FALLBACK_PS] = gState->GetPipeline(pGraphicsPipelineLib, (wstring(name) + L"_FallbackPS").c_str());
 	}
 
 	return pipeline;
@@ -539,7 +539,7 @@ bool MeshShaderFallbackLayer::createCommandLayouts(const Device* pDevice)
 	return true;
 }
 
-bool MeshShaderFallbackLayer::createDescriptorTables(DescriptorTableCache* pDescriptorTableCache)
+bool MeshShaderFallbackLayer::createDescriptorTables(DescriptorTableLib* pDescriptorTableLib)
 {
 	// Payload UAVs
 	{
@@ -550,14 +550,14 @@ bool MeshShaderFallbackLayer::createDescriptorTables(DescriptorTableCache* pDesc
 		};
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-		XUSG_X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
+		XUSG_X_RETURN(m_uavTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableLib), false);
 	}
 
 	// Payload SRVs
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_vertPayloads->GetSRV());
-		XUSG_X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableCache), false);
+		XUSG_X_RETURN(m_srvTable, descriptorTable->GetCbvSrvUavTable(pDescriptorTableLib), false);
 	}
 
 	return true;

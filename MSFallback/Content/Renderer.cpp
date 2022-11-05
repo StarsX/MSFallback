@@ -11,23 +11,23 @@ using namespace XUSG;
 
 Renderer::Renderer()
 {
-	m_shaderPool = ShaderPool::MakeUnique();
+	m_shaderLib = ShaderLib::MakeUnique();
 }
 
 Renderer::~Renderer()
 {
 }
 
-bool Renderer::Init(CommandList* pCommandList, const DescriptorTableCache::sptr& descriptorTableCache,
+bool Renderer::Init(CommandList* pCommandList, const DescriptorTableLib::sptr& descriptorTableLib,
 	uint32_t width, uint32_t height, Format rtFormat, vector<Resource::uptr>& uploaders, uint32_t objCount,
 	const wstring* pFileNames, const ObjectDef* pObjDefs, bool isMSSupported)
 {
 	const auto pDevice = pCommandList->GetDevice();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeUnique(pDevice);
-	m_computePipelineCache = Compute::PipelineCache::MakeUnique(pDevice);
-	m_meshShaderPipelineCache = MeshShader::PipelineCache::MakeUnique(pDevice);
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeUnique(pDevice);
-	m_descriptorTableCache = descriptorTableCache;
+	m_graphicsPipelineLib = Graphics::PipelineLib::MakeUnique(pDevice);
+	m_computePipelineLib = Compute::PipelineLib::MakeUnique(pDevice);
+	m_meshShaderPipelineLib = MeshShader::PipelineLib::MakeUnique(pDevice);
+	m_pipelineLayoutLib = PipelineLayoutLib::MakeUnique(pDevice);
+	m_descriptorTableLib = descriptorTableLib;
 	m_meshShaderFallbackLayer = make_unique<MeshShaderFallbackLayer>(isMSSupported);
 
 	m_viewport.x = static_cast<float>(width);
@@ -84,7 +84,7 @@ bool Renderer::Init(CommandList* pCommandList, const DescriptorTableCache::sptr&
 			uint32_t MeshletIndex;
 		};
 
-		XUSG_N_RETURN(m_meshShaderFallbackLayer->Init(pDevice, m_descriptorTableCache.get(), maxMeshletCount,
+		XUSG_N_RETURN(m_meshShaderFallbackLayer->Init(pDevice, m_descriptorTableLib.get(), maxMeshletCount,
 			MAX_VERTS, MAX_PRIMS, sizeof(VertexOut), AS_GROUP_SIZE), false);
 	}
 
@@ -292,7 +292,7 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		pipelineLayout->SetRange(SRV_INPUTS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRV_INPUTS, Shader::MS);
 		pipelineLayout->SetRootSRV(SRV_CULL, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
-		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pipelineLayout.get(), m_pipelineLayoutCache.get(),
+		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pipelineLayout.get(), m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"MeshletLayout");
 
 		XUSG_N_RETURN(m_pipelineLayout.IsValid(isMSSupported), false);
@@ -305,23 +305,23 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 {
 	// Meshlet-culling pipeline
 	{
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
-		XUSG_N_RETURN(m_shaderPool->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::AS, AS_MESHLET, L"ASMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::MS, MS_MESHLET, L"MSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::CS, CS_MESHLET_AS, L"CSMeshletAS.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::CS, CS_MESHLET_MS, L"CSMeshletMS.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
 
 		const auto state = MeshShader::State::MakeUnique();
-		state->SetShader(Shader::Stage::AS, m_shaderPool->GetShader(Shader::Stage::AS, AS_MESHLET));
-		state->SetShader(Shader::Stage::MS, m_shaderPool->GetShader(Shader::Stage::MS, MS_MESHLET));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_MESHLET));
+		state->SetShader(Shader::Stage::AS, m_shaderLib->GetShader(Shader::Stage::AS, AS_MESHLET));
+		state->SetShader(Shader::Stage::MS, m_shaderLib->GetShader(Shader::Stage::MS, MS_MESHLET));
+		state->SetShader(Shader::Stage::PS, m_shaderLib->GetShader(Shader::Stage::PS, PS_MESHLET));
 		state->OMSetNumRenderTargets(1);
 		state->OMSetRTVFormat(0, rtFormat);
 		state->OMSetDSVFormat(dsFormat);
-		m_pipeline = m_meshShaderFallbackLayer->GetPipeline(m_pipelineLayout, m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_AS),
-			m_shaderPool->GetShader(Shader::Stage::CS, CS_MESHLET_MS), m_shaderPool->GetShader(Shader::Stage::VS, VS_MESHLET),
-			state.get(), m_meshShaderPipelineCache.get(), m_computePipelineCache.get(), m_graphicsPipelineCache.get(), L"MeshletPipe");
+		m_pipeline = m_meshShaderFallbackLayer->GetPipeline(m_pipelineLayout, m_shaderLib->GetShader(Shader::Stage::CS, CS_MESHLET_AS),
+			m_shaderLib->GetShader(Shader::Stage::CS, CS_MESHLET_MS), m_shaderLib->GetShader(Shader::Stage::VS, VS_MESHLET),
+			state.get(), m_meshShaderPipelineLib.get(), m_computePipelineLib.get(), m_graphicsPipelineLib.get(), L"MeshletPipe");
 
 		XUSG_N_RETURN(m_pipeline.IsValid(isMSSupported), false);
 	}
@@ -345,7 +345,7 @@ bool Renderer::createDescriptorTables()
 			};
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			XUSG_X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			XUSG_X_RETURN(mesh.SrvTable, descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 		}
 	}
 

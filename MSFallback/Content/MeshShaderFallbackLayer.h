@@ -55,19 +55,19 @@ public:
 	MeshShaderFallbackLayer(bool isMSSupported);
 	virtual ~MeshShaderFallbackLayer();
 
-	bool Init(const XUSG::Device* pDevice, XUSG::DescriptorTableCache* pDescriptorTableCache, uint32_t maxMeshletCount,
+	bool Init(const XUSG::Device* pDevice, XUSG::DescriptorTableLib* pDescriptorTableLib, uint32_t maxMeshletCount,
 		uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 
 	PipelineLayout GetPipelineLayout(XUSG::Util::PipelineLayout* pUtilPipelineLayout,
-		XUSG::PipelineLayoutCache* pPipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
+		XUSG::PipelineLayoutLib* pPipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
 		const wchar_t* name = nullptr);
 
 	Pipeline GetPipeline(const PipelineLayout& pipelineLayout,
 		const XUSG::Blob& csAS, const XUSG::Blob& csMS,
 		const XUSG::Blob& vsMS, XUSG::MeshShader::State* pState,
-		XUSG::MeshShader::PipelineCache* pMeshShaderPipelineCache,
-		XUSG::Compute::PipelineCache* pComputePipelineCache,
-		XUSG::Graphics::PipelineCache* pGraphicsPipelineCache,
+		XUSG::MeshShader::PipelineLib* pMeshShaderPipelineLib,
+		XUSG::Compute::PipelineLib* pComputePipelineLib,
+		XUSG::Graphics::PipelineLib* pGraphicsPipelineLib,
 		const wchar_t* name = nullptr);
 
 	void EnableNativeMeshShader(bool enable);
@@ -122,7 +122,7 @@ protected:
 	bool createPayloadBuffers(const XUSG::Device* pDevice, uint32_t maxMeshletCount, uint32_t groupVertCount,
 		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 	bool createCommandLayouts(const XUSG::Device* pDevice);
-	bool createDescriptorTables(XUSG::DescriptorTableCache* pDescriptorTableCache);
+	bool createDescriptorTables(XUSG::DescriptorTableLib* pDescriptorTableLib);
 
 	XUSG::CommandLayout::uptr		m_commandLayouts[COMMAND_LAYOUT_COUNT];
 
