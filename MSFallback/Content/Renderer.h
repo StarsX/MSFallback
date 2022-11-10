@@ -92,7 +92,7 @@ protected:
 
 	bool createMeshBuffers(XUSG::CommandList* pCommandList, ObjectMesh& mesh,
 		const Mesh& meshData, std::vector<XUSG::Resource::uptr>& uploaders);
-	bool createPipelineLayouts(bool isMSSupported);
+	bool createPipelineLayouts(const XUSG::Device* pDevice, bool isMSSupported);
 	bool createPipelines(XUSG::Format rtFormat, XUSG::Format dsFormat, bool isMSSupported);
 	bool createDescriptorTables();
 

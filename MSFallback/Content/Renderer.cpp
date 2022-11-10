@@ -93,7 +93,7 @@ bool Renderer::Init(CommandList* pCommandList, const DescriptorTableLib::sptr& d
 	XUSG_N_RETURN(m_depth->Create(pDevice, width, height, Format::D24_UNORM_S8_UINT, ResourceFlag::DENY_SHADER_RESOURCE), false);
 
 	// Create pipelines
-	XUSG_N_RETURN(createPipelineLayouts(isMSSupported), false);
+	XUSG_N_RETURN(createPipelineLayouts(pDevice, isMSSupported), false);
 	XUSG_N_RETURN(createPipelines(rtFormat, m_depth->GetFormat(), isMSSupported), false);
 	XUSG_N_RETURN(createDescriptorTables(), false);
 
@@ -281,7 +281,7 @@ bool Renderer::createMeshBuffers(CommandList* pCommandList, ObjectMesh& mesh,
 	return true;
 }
 
-bool Renderer::createPipelineLayouts(bool isMSSupported)
+bool Renderer::createPipelineLayouts(const XUSG::Device* pDevice, bool isMSSupported)
 {
 	// Meshlet-culling pipeline layout
 	{
@@ -292,8 +292,8 @@ bool Renderer::createPipelineLayouts(bool isMSSupported)
 		pipelineLayout->SetRange(SRV_INPUTS, DescriptorType::SRV, 4, 0, 0, DescriptorFlag::DATA_STATIC);
 		pipelineLayout->SetShaderStage(SRV_INPUTS, Shader::MS);
 		pipelineLayout->SetRootSRV(SRV_CULL, 4, 0, DescriptorFlag::DATA_STATIC, Shader::AS);
-		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pipelineLayout.get(), m_pipelineLayoutLib.get(),
-			PipelineLayoutFlag::NONE, L"MeshletLayout");
+		m_pipelineLayout = m_meshShaderFallbackLayer->GetPipelineLayout(pDevice, pipelineLayout.get(),
+			m_pipelineLayoutLib.get(), PipelineLayoutFlag::NONE, L"MeshletLayout");
 
 		XUSG_N_RETURN(m_pipelineLayout.IsValid(isMSSupported), false);
 	}

@@ -79,14 +79,16 @@ struct DispatchArgs
 {
 	struct DrawIndexedArgs
 	{
-		uint indexCountPerInstance;
-		uint instanceCount;
-		uint startIndexLocation;
-		int baseVertexLocation;
-		uint startInstanceLocation;
+		uint BatchIdx;
+		uint IndexCountPerInstance;
+		uint InstanceCount;
+		uint StartIndexLocation;
+		int BaseVertexLocation;
+		uint StartInstanceLocation;
 	} DrawArgs;
 	struct ASDispatchMeshArgs
 	{
+		uint BatchIdx;
 		uint x;
 		uint y;
 		uint z;

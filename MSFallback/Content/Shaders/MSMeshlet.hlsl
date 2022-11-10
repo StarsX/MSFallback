@@ -6,8 +6,12 @@
 
 #define MS_GROUP_SIZE 128
 
-#ifndef OUT_IDX
-#define OUT_IDX(i) i
+#ifndef VERT_IDX
+#define VERT_IDX(i) i
+#endif
+
+#ifndef PRIM_IDX
+#define PRIM_IDX(i) i
 #endif
 
 #ifndef GET_MESHLET_IDX
@@ -94,8 +98,8 @@ void main(
 	if (gtid < m.VertCount)
 	{
 		const uint vertexIndex = GetVertexIndex(m, gtid);
-		verts[OUT_IDX(gtid)] = GetVertexAttributes(meshletIndex, vertexIndex);
+		verts[VERT_IDX(gtid)] = GetVertexAttributes(meshletIndex, vertexIndex);
 	}
 
-	if (gtid < m.PrimCount) tris[OUT_IDX(gtid)] = GetPrimitive(m, gtid);
+	if (gtid < m.PrimCount) tris[PRIM_IDX(gtid)] = GetPrimitive(m, gtid);
 }

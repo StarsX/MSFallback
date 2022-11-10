@@ -18,10 +18,20 @@ public:
 		FALLBACK_PIPE_COUNT
 	};
 
+	enum CommandLayoutType
+	{
+		DISPATCH,
+		DRAW_INDEXED,
+
+		COMMAND_LAYOUT_COUNT
+	};
+
 	class PipelineLayout
 	{
 	public:
+		void CreateCommandLayouts(const XUSG::Device* pDevice, uint32_t batchIndexMS, uint32_t batchIndexVS);
 		bool IsValid(bool isMSSupported) const;
+		const XUSG::CommandLayout* GetCommandLayout(CommandLayoutType type) const;
 		XUSG::PipelineLayout m_native;
 	private:
 		friend MeshShaderFallbackLayer;
@@ -37,9 +47,9 @@ public:
 		uint32_t m_payloadUavIndexAS;
 		uint32_t m_payloadUavIndexMS;
 		uint32_t m_payloadSrvIndexMS;
-		uint32_t m_batchIndexMS;
 		uint32_t m_payloadSrvIndexVS;
-		uint32_t m_batchIndexVS;
+
+		XUSG::CommandLayout::uptr m_commandLayouts[COMMAND_LAYOUT_COUNT];
 	};
 
 	class Pipeline
@@ -58,7 +68,7 @@ public:
 	bool Init(const XUSG::Device* pDevice, XUSG::DescriptorTableLib* pDescriptorTableLib, uint32_t maxMeshletCount,
 		uint32_t groupVertCount, uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
 
-	PipelineLayout GetPipelineLayout(XUSG::Util::PipelineLayout* pUtilPipelineLayout,
+	PipelineLayout GetPipelineLayout(const XUSG::Device* pDevice, XUSG::Util::PipelineLayout* pUtilPipelineLayout,
 		XUSG::PipelineLayoutLib* pPipelineLayoutCache, XUSG::PipelineLayoutFlag flags,
 		const wchar_t* name = nullptr);
 
@@ -83,14 +93,6 @@ public:
 	void DispatchMesh(XUSG::Ultimate::CommandList* pCommandList, uint32_t ThreadGroupCountX, uint32_t ThreadGroupCountY, uint32_t ThreadGroupCountZ);
 
 protected:
-	enum CommandLayoutType
-	{
-		DISPATCH,
-		DRAW_INDEXED,
-
-		COMMAND_LAYOUT_COUNT
-	};
-
 	struct PipelineSetCommands
 	{
 		struct SetDescriptorTable
@@ -121,10 +123,7 @@ protected:
 
 	bool createPayloadBuffers(const XUSG::Device* pDevice, uint32_t maxMeshletCount, uint32_t groupVertCount,
 		uint32_t groupPrimCount, uint32_t vertexStride, uint32_t batchSize);
-	bool createCommandLayouts(const XUSG::Device* pDevice);
 	bool createDescriptorTables(XUSG::DescriptorTableLib* pDescriptorTableLib);
-
-	XUSG::CommandLayout::uptr		m_commandLayouts[COMMAND_LAYOUT_COUNT];
 
 	XUSG::DescriptorTable			m_srvTable;
 	XUSG::DescriptorTable			m_uavTable;
