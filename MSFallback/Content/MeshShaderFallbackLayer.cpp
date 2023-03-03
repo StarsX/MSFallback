@@ -207,8 +207,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 			const Graphics::Blend* pBlend;
 			const Graphics::Rasterizer* pRasterizer;
 			const Graphics::DepthStencil* pDepthStencil;
-			const void* pCachedBlob;
-			size_t CachedBlobSize;
+			Blob CachedPipeline;
 			PrimitiveTopologyType PrimTopologyType;
 			uint8_t	NumRenderTargets;
 			Format RTVFormats[8];
@@ -229,7 +228,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 		if (pKey->pBlend) gState->OMSetBlendState(pKey->pBlend, pKey->SampleMask);
 		if (pKey->pRasterizer) gState->RSSetState(pKey->pRasterizer);
 		if (pKey->pDepthStencil) gState->DSSetState(pKey->pDepthStencil);
-		if (pKey->pCachedBlob) gState->SetCachedPipeline(pKey->pCachedBlob, pKey->CachedBlobSize);
+		if (pKey->CachedPipeline) gState->SetCachedPipeline(pKey->CachedPipeline);
 		gState->IASetPrimitiveTopologyType(pKey->PrimTopologyType);
 
 		gState->OMSetNumRenderTargets(pKey->NumRenderTargets);
