@@ -11,6 +11,7 @@
 
 #include "SharedConst.h"
 #include "MSFallback.h"
+#include "stb_image_write.h"
 
 using namespace std;
 using namespace XUSG;
@@ -243,6 +244,9 @@ void MSFallback::OnKeyUp(uint8_t key)
 	case VK_F1:
 		m_showFPS = !m_showFPS;
 		break;
+	case VK_F11:
+		m_screenShot = 1;
+		break;
 	case 'P':
 		m_useMeshShader = !m_useMeshShader && m_isMSSupported;
 		break;
@@ -352,20 +356,30 @@ void MSFallback::PopulateCommandList()
 	const auto descriptorHeap = m_descriptorTableLib->GetDescriptorHeap(CBV_SRV_UAV_HEAP);
 	pCommandList->SetDescriptorHeaps(1, &descriptorHeap);
 
+	const auto pRenderTarget = m_renderTargets[m_frameIndex].get();
+
 	// Set resource barrier
 	ResourceBarrier barrier;
-	auto numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(&barrier, ResourceState::RENDER_TARGET);
+	auto numBarriers = pRenderTarget->SetBarrier(&barrier, ResourceState::RENDER_TARGET);
 	pCommandList->Barrier(numBarriers, &barrier);
 
 	const float clearColor[] = { CLEAR_COLOR, 1.0f };
-	pCommandList->ClearRenderTargetView(m_renderTargets[m_frameIndex]->GetRTV(), clearColor);
+	pCommandList->ClearRenderTargetView(pRenderTarget->GetRTV(), clearColor);
 
 	// Rendering
-	m_renderer->Render(pCommandList, m_frameIndex, m_renderTargets[m_frameIndex]->GetRTV(), m_useMeshShader);
+	m_renderer->Render(pCommandList, m_frameIndex, pRenderTarget->GetRTV(), m_useMeshShader);
 
 	// Indicate that the back buffer will now be used to present.
-	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(&barrier, ResourceState::PRESENT);
+	numBarriers = pRenderTarget->SetBarrier(&barrier, ResourceState::PRESENT);
 	pCommandList->Barrier(numBarriers, &barrier);
+
+	// Screen-shot helper
+	if (m_screenShot == 1)
+	{
+		if (!m_readBuffer) m_readBuffer = Buffer::MakeUnique();
+		pRenderTarget->ReadBack(pCommandList, m_readBuffer.get(), &m_rowPitch);
+		m_screenShot = 2;
+	}
 
 	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 }
@@ -400,6 +414,43 @@ void MSFallback::MoveToNextFrame()
 
 	// Set the fence value for the next frame.
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
+
+	// Screen-shot helper
+	if (m_screenShot)
+	{
+		if (m_screenShot > FrameCount)
+		{
+			char timeStr[15];
+			tm dateTime;
+			const auto now = time(nullptr);
+			if (!localtime_s(&dateTime, &now) && strftime(timeStr, sizeof(timeStr), "%Y%m%d%H%M%S", &dateTime))
+				SaveImage((string("MSFallback_") + timeStr + ".png").c_str(), m_readBuffer.get(), m_width, m_height, m_rowPitch);
+			m_screenShot = 0;
+		}
+		else ++m_screenShot;
+	}
+}
+
+void MSFallback::SaveImage(char const* fileName, Buffer* imageBuffer, uint32_t w, uint32_t h, uint32_t rowPitch, uint8_t comp)
+{
+	assert(comp == 3 || comp == 4);
+	const auto pData = static_cast<uint8_t*>(imageBuffer->Map(nullptr));
+
+	//stbi_write_png_compression_level = 1024;
+	vector<uint8_t> imageData(comp * w * h);
+	const auto sw = rowPitch / 4;
+	for (auto i = 0u; i < h; ++i)
+		for (auto j = 0u; j < w; ++j)
+		{
+			const auto s = sw * i + j;
+			const auto d = w * i + j;
+			for (uint8_t k = 0; k < comp; ++k)
+				imageData[comp * d + k] = pData[4 * s + k];
+		}
+
+	stbi_write_png(fileName, w, h, comp, imageData.data(), 0);
+
+	m_readBuffer->Unmap();
 }
 
 double MSFallback::CalculateFrameStats(float* pTimeStep)
@@ -426,6 +477,8 @@ double MSFallback::CalculateFrameStats(float* pTimeStep)
 		else windowText << L"[F1]";
 		windowText << L"    [P] " << (m_useMeshShader ? "Mesh-shader pipeline" : "Fallback pipelines");
 		windowText << L"    [C] " << (m_useDebugCamera ? "Culling camera" : "Third-person camera");
+		windowText << L"    [F11] screen shot";
+
 		SetCustomWindowText(windowText.str().c_str());
 	}
 
