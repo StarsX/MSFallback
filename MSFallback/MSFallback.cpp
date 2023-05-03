@@ -30,7 +30,8 @@ MSFallback::MSFallback(uint32_t width, uint32_t height, std::wstring name) :
 	m_pausing(false),
 	m_tracking(false),
 	m_modelFilenames{ L"Assets/Dragon_LOD0.bin" },
-	m_objDefs{ { {}, {}, 0.2f, true, true } }  // View Model
+	m_objDefs{ { {}, {}, 0.2f, true, true } }, // View Model
+	m_screenShot(0)
 {
 #if defined (_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
