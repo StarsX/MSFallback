@@ -152,6 +152,9 @@
     <ClCompile Include="Content\MeshShaderFallbackLayer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Common\stb_image_write.cpp">
+      <Filter>Common\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\Shaders\PSMeshlet.hlsl">
