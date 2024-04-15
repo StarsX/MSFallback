@@ -158,7 +158,7 @@ MeshShaderFallbackLayer::PipelineLayout MeshShaderFallbackLayer::GetPipelineLayo
 }
 
 MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const PipelineLayout& pipelineLayout, const Blob& csAS,
-	const Blob& csMS, const Blob& vsMS, MeshShader::State* pState, MeshShader::PipelineLib* pMeshShaderPipelineLib,
+	const Blob& csMS, const Blob& vsMS, Ultimate::State* pState, Ultimate::PipelineLib* pMeshPipelineLib,
 	Compute::PipelineLib* pComputePipelineLib, Graphics::PipelineLib* pGraphicsPipelineLib, const wchar_t* name)
 {
 	Pipeline pipeline = {};
@@ -167,7 +167,7 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 	if (m_isMSSupported)
 	{
 		pState->SetPipelineLayout(pipelineLayout.m_native);
-		pipeline.m_native = pState->GetPipeline(pMeshShaderPipelineLib, (wstring(name) + L"_Native").c_str());
+		pipeline.m_native = pState->GetPipeline(pMeshPipelineLib, (wstring(name) + L"_Native").c_str());
 	}
 
 	// Compute-shader fallback for amplification shader
@@ -191,22 +191,14 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 	// Vertex-shader fallback for mesh shader
 	assert(vsMS);
 	{
-		enum Stage
+		struct PipelineDesc
 		{
-			PS,
-			MS,
-			AS,
-
-			NUM_STAGE
-		};
-
-		struct Key
-		{
-			void* PipelineLayout;
-			void* Shaders[NUM_STAGE];
+			XUSG::PipelineLayout Layout;
+			Blob Shaders[Shader::Stage::NUM_STAGE];
 			const Graphics::Blend* pBlend;
 			const Graphics::Rasterizer* pRasterizer;
 			const Graphics::DepthStencil* pDepthStencil;
+			const InputLayout* pInputLayout;
 			Blob CachedPipeline;
 			PrimitiveTopologyType PrimTopologyType;
 			uint8_t	NumRenderTargets;
@@ -215,15 +207,20 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 			uint8_t	SampleCount;
 			uint8_t SampleQuality;
 			uint32_t SampleMask;
+			uint8_t IBStripCutValue;
 			uint32_t NodeMask;
+			PipelineFlag Flags;
+			uint8_t NumViewInstances;
+			Ultimate::ViewInstance ViewInstances[4];
+			Ultimate::ViewInstanceFlag ViewInstanceFlags;
 		};
 
-		const auto& pKey = reinterpret_cast<const Key*>(pState->GetKey().c_str());
+		const auto pKey = reinterpret_cast<const PipelineDesc*>(pState->GetKey().data());
 		const auto gState = Graphics::State::MakeUnique();
 
 		gState->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_PS]);
 		gState->SetShader(Shader::Stage::VS, vsMS);
-		if (pKey->Shaders[PS]) gState->SetShader(Shader::Stage::PS, pKey->Shaders[PS]);
+		if (pKey->Shaders[Shader::Stage::PS]) gState->SetShader(Shader::Stage::PS, pKey->Shaders[Shader::Stage::PS]);
 
 		if (pKey->pBlend) gState->OMSetBlendState(pKey->pBlend, pKey->SampleMask);
 		if (pKey->pRasterizer) gState->RSSetState(pKey->pRasterizer);

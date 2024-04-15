@@ -60,6 +60,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Content\;$(ProjectDir)Content\Shaders\</AdditionalIncludeDirectories>
       <ShaderModel>6.2</ShaderModel>
       <AllResourcesBound>true</AllResourcesBound>
+      <AdditionalOptions>/Qembed_debug</AdditionalOptions>
     </FxCompile>
     <PostBuildEvent>
       <Command>COPY /Y "$(OutDir)*.cso" "$(ProjectDir)..\Bin\"

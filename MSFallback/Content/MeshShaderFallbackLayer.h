@@ -74,8 +74,8 @@ public:
 
 	Pipeline GetPipeline(const PipelineLayout& pipelineLayout,
 		const XUSG::Blob& csAS, const XUSG::Blob& csMS,
-		const XUSG::Blob& vsMS, XUSG::MeshShader::State* pState,
-		XUSG::MeshShader::PipelineLib* pMeshShaderPipelineLib,
+		const XUSG::Blob& vsMS, XUSG::Ultimate::State* pState,
+		XUSG::Ultimate::PipelineLib* pMeshPipelineLib,
 		XUSG::Compute::PipelineLib* pComputePipelineLib,
 		XUSG::Graphics::PipelineLib* pGraphicsPipelineLib,
 		const wchar_t* name = nullptr);

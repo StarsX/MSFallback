@@ -105,7 +105,7 @@ protected:
 	XUSG::ShaderLib::uptr				m_shaderLib;
 	XUSG::Graphics::PipelineLib::uptr	m_graphicsPipelineLib;
 	XUSG::Compute::PipelineLib::uptr	m_computePipelineLib;
-	XUSG::MeshShader::PipelineLib::uptr	m_meshShaderPipelineLib;
+	XUSG::Ultimate::PipelineLib::uptr	m_meshPipelineLib;
 	XUSG::PipelineLayoutLib::uptr		m_pipelineLayoutLib;
 	XUSG::DescriptorTableLib::sptr		m_descriptorTableLib;
 

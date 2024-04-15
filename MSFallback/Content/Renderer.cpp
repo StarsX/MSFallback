@@ -25,7 +25,7 @@ bool Renderer::Init(CommandList* pCommandList, const DescriptorTableLib::sptr& d
 	const auto pDevice = pCommandList->GetDevice();
 	m_graphicsPipelineLib = Graphics::PipelineLib::MakeUnique(pDevice);
 	m_computePipelineLib = Compute::PipelineLib::MakeUnique(pDevice);
-	m_meshShaderPipelineLib = MeshShader::PipelineLib::MakeUnique(pDevice);
+	m_meshPipelineLib = Ultimate::PipelineLib::MakeUnique(pDevice);
 	m_pipelineLayoutLib = PipelineLayoutLib::MakeUnique(pDevice);
 	m_descriptorTableLib = descriptorTableLib;
 	m_meshShaderFallbackLayer = make_unique<MeshShaderFallbackLayer>(isMSSupported);
@@ -312,7 +312,7 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::VS, VS_MESHLET, L"VSMeshlet.cso"), false);
 		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_MESHLET, L"PSMeshlet.cso"), false);
 
-		const auto state = MeshShader::State::MakeUnique();
+		const auto state = Ultimate::State::MakeUnique();
 		state->SetShader(Shader::Stage::AS, m_shaderLib->GetShader(Shader::Stage::AS, AS_MESHLET));
 		state->SetShader(Shader::Stage::MS, m_shaderLib->GetShader(Shader::Stage::MS, MS_MESHLET));
 		state->SetShader(Shader::Stage::PS, m_shaderLib->GetShader(Shader::Stage::PS, PS_MESHLET));
@@ -321,7 +321,7 @@ bool Renderer::createPipelines(Format rtFormat, Format dsFormat, bool isMSSuppor
 		state->OMSetDSVFormat(dsFormat);
 		m_pipeline = m_meshShaderFallbackLayer->GetPipeline(m_pipelineLayout, m_shaderLib->GetShader(Shader::Stage::CS, CS_MESHLET_AS),
 			m_shaderLib->GetShader(Shader::Stage::CS, CS_MESHLET_MS), m_shaderLib->GetShader(Shader::Stage::VS, VS_MESHLET),
-			state.get(), m_meshShaderPipelineLib.get(), m_computePipelineLib.get(), m_graphicsPipelineLib.get(), L"MeshletPipe");
+			state.get(), m_meshPipelineLib.get(), m_computePipelineLib.get(), m_graphicsPipelineLib.get(), L"MeshletPipe");
 
 		XUSG_N_RETURN(m_pipeline.IsValid(isMSSupported), false);
 	}
