@@ -191,48 +191,35 @@ MeshShaderFallbackLayer::Pipeline MeshShaderFallbackLayer::GetPipeline(const Pip
 	// Vertex-shader fallback for mesh shader
 	assert(vsMS);
 	{
-		struct PipelineDesc
-		{
-			XUSG::PipelineLayout Layout;
-			Blob Shaders[Shader::Stage::NUM_STAGE];
-			const Graphics::Blend* pBlend;
-			const Graphics::Rasterizer* pRasterizer;
-			const Graphics::DepthStencil* pDepthStencil;
-			const InputLayout* pInputLayout;
-			Blob CachedPipeline;
-			PrimitiveTopologyType PrimTopologyType;
-			uint8_t	NumRenderTargets;
-			Format RTVFormats[8];
-			Format	DSVFormat;
-			uint8_t	SampleCount;
-			uint8_t SampleQuality;
-			uint32_t SampleMask;
-			uint8_t IBStripCutValue;
-			uint32_t NodeMask;
-			PipelineFlag Flags;
-			uint8_t NumViewInstances;
-			Ultimate::ViewInstance ViewInstances[4];
-			Ultimate::ViewInstanceFlag ViewInstanceFlags;
-		};
-
-		const auto pKey = reinterpret_cast<const PipelineDesc*>(pState->GetKey().data());
 		const auto gState = Graphics::State::MakeUnique();
 
 		gState->SetPipelineLayout(pipelineLayout.m_fallbacks[FALLBACK_PS]);
 		gState->SetShader(Shader::Stage::VS, vsMS);
-		if (pKey->Shaders[Shader::Stage::PS]) gState->SetShader(Shader::Stage::PS, pKey->Shaders[Shader::Stage::PS]);
 
-		if (pKey->pBlend) gState->OMSetBlendState(pKey->pBlend, pKey->SampleMask);
-		if (pKey->pRasterizer) gState->RSSetState(pKey->pRasterizer);
-		if (pKey->pDepthStencil) gState->DSSetState(pKey->pDepthStencil);
-		if (pKey->CachedPipeline) gState->SetCachedPipeline(pKey->CachedPipeline);
-		gState->IASetPrimitiveTopologyType(pKey->PrimTopologyType);
+		const auto ps = pState->GetShader(Shader::Stage::PS);
+		if (ps) gState->SetShader(Shader::Stage::PS, ps);
 
-		gState->OMSetNumRenderTargets(pKey->NumRenderTargets);
-		for (auto i = 0; i < 8; ++i) gState->OMSetRTVFormat(i, pKey->RTVFormats[i]);
-		gState->OMSetDSVFormat(pKey->DSVFormat);
+		const auto pBlend = pState->OMGetBlendState();
+		const auto sampleMask = pState->OMGetSampleMask();
+		if (pBlend) gState->OMSetBlendState(pBlend, sampleMask);
 
-		gState->OMSetSample(pKey->SampleCount, pKey->SampleQuality);
+		const auto pRasterizer = pState->RSGetState();
+		if (pRasterizer) gState->RSSetState(pRasterizer);
+
+		const auto pDepthStencil = pState->DSGetState();
+		if (pDepthStencil) gState->DSSetState(pDepthStencil);
+
+		gState->SetNodeMask(pState->GetNodeMask());
+		gState->SetFlags(pState->GetFlags());
+
+		gState->IASetPrimitiveTopologyType(pState->IAGetPrimitiveTopologyType());
+		gState->IASetIndexBufferStripCutValue(pState->IAGetIndexBufferStripCutValue());
+
+		gState->OMSetNumRenderTargets(pState->OMGetNumRenderTargets());
+		for (auto i = 0; i < 8; ++i) gState->OMSetRTVFormat(i, pState->OMGetRTVFormat(i));
+		gState->OMSetDSVFormat(pState->OMGetDSVFormat());
+
+		gState->OMSetSample(pState->OMGetSampleCount(), pState->OMGetSampleQuality());
 
 		pipeline.m_fallbacks[FALLBACK_PS] = gState->GetPipeline(pGraphicsPipelineLib, (wstring(name) + L"_FallbackPS").c_str());
 	}
