@@ -348,25 +348,42 @@ void MSFallback::OnMouseLeave()
 
 void MSFallback::ParseCommandLineArgs(wchar_t* argv[], int argc)
 {
+	const auto str_tolower = [](wstring s)
+	{
+		transform(s.begin(), s.end(), s.begin(), [](wchar_t c) { return towlower(c); });
+
+		return s;
+	};
+
+	const auto isArgMatched = [&argv, &str_tolower](int i, const wchar_t* paramName)
+	{
+		const auto& arg = argv[i];
+
+		return (arg[0] == L'-' || arg[0] == L'/')
+			&& str_tolower(&arg[1]) == str_tolower(paramName);
+	};
+
+	const auto hasNextArgValue = [&argv, &argc](int i)
+	{
+		const auto& arg = argv[i + 1];
+
+		return i + 1 < argc && arg[0] != L'/' &&
+			(arg[0] != L'-' || (arg[1] >= L'0' && arg[1] <= L'9') || arg[1] == L'.');
+	};
+
 	DXFramework::ParseCommandLineArgs(argv, argc);
 
 	for (auto i = 1; i < argc; ++i)
 	{
-		if (wcsncmp(argv[i], L"-warp", wcslen(argv[i])) == 0 ||
-			wcsncmp(argv[i], L"/warp", wcslen(argv[i])) == 0)
-			m_deviceType = DEVICE_WARP;
-		else if (wcsncmp(argv[i], L"-uma", wcslen(argv[i])) == 0 ||
-			wcsncmp(argv[i], L"/uma", wcslen(argv[i])) == 0)
-			m_deviceType = DEVICE_UMA;
-		else if (wcsncmp(argv[i], L"-mesh", wcslen(argv[i])) == 0 ||
-			wcsncmp(argv[i], L"/mesh", wcslen(argv[i])) == 0)
+		if (isArgMatched(i, L"warp")) m_deviceType = DEVICE_WARP;
+		else if (isArgMatched(i, L"uma")) m_deviceType = DEVICE_UMA;
+		else if (isArgMatched(i, L"mesh"))
 		{
-			if (i + 1 < argc) m_modelFilenames[0] = argv[++i];
-			if (i + 1 < argc)  m_objDefs[0].Position.x = stof(argv[++i]);
-			if (i + 1 < argc)  m_objDefs[0].Position.y = stof(argv[++i]);
-			if (i + 1 < argc)  m_objDefs[0].Position.z = stof(argv[++i]);
-			if (i + 1 < argc)  m_objDefs[0].Scale = stof(argv[++i]);
-			break;
+			if (hasNextArgValue(i)) m_modelFilenames[0] = argv[++i];
+			if (hasNextArgValue(i)) i += swscanf_s(argv[i + 1], L"%f", &m_objDefs[0].Position.x);
+			if (hasNextArgValue(i)) i += swscanf_s(argv[i + 1], L"%f", &m_objDefs[0].Position.y);
+			if (hasNextArgValue(i)) i += swscanf_s(argv[i + 1], L"%f", &m_objDefs[0].Position.z);
+			if (hasNextArgValue(i)) i += swscanf_s(argv[i + 1], L"%f", &m_objDefs[0].Scale);
 		}
 	}
 }
